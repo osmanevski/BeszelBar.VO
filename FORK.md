@@ -45,6 +45,12 @@ Changes to upstream files were kept as small as possible:
 | `App/AppState.swift` | Fallback logic in `loadSystems()`, `loadFromSSH()`, SSH target management, and a `dataSource` guard on the three hub-only loaders. |
 | `App/SettingsView.swift` | One new tab case. |
 | `Menu/MenuBuilder.swift` | A banner when SSH is carrying the app; the empty state now accounts for SSH-only setups. |
+| `Menu/Views/MenuHeaderView.swift` | Title and subtitle. |
+| `App/SettingsView.swift` (About) | Points at this fork; the original author's copyright notice stays. |
+
+**Building your own copy?** The header subtitle is hardcoded in
+`Sources/Menu/Views/MenuHeaderView.swift` — one string, one line. Upstream showed
+the selected hub's name there, if you would rather have that back.
 
 ## The mapping was almost free
 

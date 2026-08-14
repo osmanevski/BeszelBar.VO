@@ -453,31 +453,10 @@ struct EditHubSheet: View {
 struct GeneralView: View {
     @AppStorage("refreshInterval") private var refreshInterval = 30
     @AppStorage("launchAtLogin") private var launchAtLogin = false
-    @AppStorage("com.nohitdev.BeszelBar.headerSubtitle") private var headerSubtitle = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                SectionHeader(title: "APPEARANCE")
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Header subtitle")
-                        Spacer()
-                        TextField("Hub name", text: $headerSubtitle)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 180)
-                    }
-                    Text("Small line under the title in the menu. Leave empty to show the selected hub's name.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-
-                Divider()
-                    .padding(.horizontal, 20)
-
                 SectionHeader(title: "SYSTEM")
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -578,7 +557,7 @@ struct AboutView: View {
             }
             .frame(width: 80, height: 80)
 
-            Text("BeszelBar")
+            Text("BeszelBar.VO")
                 .font(.title2)
                 .fontWeight(.bold)
 
@@ -586,7 +565,7 @@ struct AboutView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
 
-            Text("Monitor your Beszel servers from the menu bar.")
+            Text("Monitor your Beszel servers from the menu bar, with SSH fallback when the hub is unreachable.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -599,7 +578,7 @@ struct AboutView: View {
                     }
                 }
 
-                if let githubURL = URL(string: "https://github.com/brunooctet/BeszelBar") {
+                if let githubURL = URL(string: "https://github.com/osmanevski/BeszelBar.VO") {
                     Link(destination: githubURL) {
                         Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
@@ -609,7 +588,9 @@ struct AboutView: View {
 
             Spacer()
 
-            Text("© 2026 Bruno DURAND. MIT License.")
+            // The original author's notice stays. The code is still largely
+            // theirs, and MIT asks for the notice to travel with it.
+            Text("Fork of BeszelBar — © 2026 Bruno DURAND. MIT License.")
                 .font(.caption2)
                 .foregroundColor(.secondary)
                 .padding(.bottom, 16)
