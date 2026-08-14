@@ -18,14 +18,6 @@ final class MenuActions: NSObject {
         }
     }
 
-    @objc func toggleSSHDirectMode(_ sender: Any?) {
-        Task { @MainActor in
-            let appState = AppState.shared
-            guard !appState.sshTargets.isEmpty else { return }
-            appState.sshDirectModeEnabled.toggle()
-        }
-    }
-
     @objc func switchHub(_ sender: NSMenuItem) {
         Task { @MainActor in
             guard let instanceID = sender.representedObject as? UUID,

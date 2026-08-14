@@ -44,9 +44,9 @@ Changes to upstream files were kept as small as possible:
 |---|---|
 | `App/AppState.swift` | Fallback logic in `loadSystems()`, `loadFromSSH()`, SSH target management, the `sshDirectModeEnabled` switch, and a `dataSource` guard on the three hub-only loaders. |
 | `App/SettingsView.swift` | One new tab case. |
-| `Menu/MenuBuilder.swift` | A banner naming whichever source is live; the **SSH Direct Mode** item under *Refresh Now*; the empty state now accounts for SSH-only setups. |
-| `Menu/MenuActions.swift` | `toggleSSHDirectMode`. |
-| `App/AppDelegate.swift` | Two more properties tracked, so the menu redraws when the source or the mode changes. |
+| `Menu/MenuBuilder.swift` | A banner naming whichever source is live; the **SSH Direct Mode** row under *Refresh Now*; `build` became `populate`; the empty state now accounts for SSH-only setups. |
+| `Menu/Views/MenuActionRow.swift` | New file. A menu row that acts on a click without closing the menu. |
+| `App/AppDelegate.swift` | One menu for the life of the app, refilled on open, plus the timer that keeps the action rows current while it is held open. |
 | `Menu/Views/MenuHeaderView.swift` | Title and subtitle. |
 | `App/SettingsView.swift` (About) | Points at this fork; the original author's copyright notice stays. |
 
@@ -103,6 +103,32 @@ the other reason to be on this path: the user asked. It sits in the menu under
 Switching it off refetches details, alerts and containers rather than waiting for
 a timer. Those three sit out the whole time SSH is carrying the app, so what is on
 screen at that moment all came from the other path.
+
+## The menu stays open
+
+*Refresh Now* and *SSH Direct Mode* both act on the menu you are looking at, and
+both used to close it — you asked to see something and the thing you would have
+seen it in went away.
+
+Two separate causes, both fixed:
+
+- **NSMenu closes whenever an item's action fires.** There is no flag for this. An
+  item with a *view* never sends its action — the view gets the click instead —
+  so those two rows are views now (`MenuActionRow`), which means drawing the
+  title, icon, checkmark and hover highlight that AppKit was drawing before.
+- **The menu was being replaced while open.** Every observed change rebuilt it
+  and assigned it to the status item, which takes the open one down. It is now
+  built once and refilled in `menuNeedsUpdate`, the moment AppKit provides for
+  exactly this.
+
+An open menu runs its own event loop, and observation gets no turn inside it, so
+a 0.35s timer in `.common` mode nudges those rows while the menu is up — without
+it the row reading "Refreshing…" would still read that long after the numbers
+landed. Everything else in the menu is what it was when you opened it; the rows
+are rebuilt on the next opening.
+
+⌘R still refreshes, and still closes the menu. A key equivalent closing a menu is
+what a key equivalent does; a click is not.
 
 ## Requirements
 

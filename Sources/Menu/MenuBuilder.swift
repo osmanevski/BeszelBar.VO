@@ -5,8 +5,14 @@ import AppKit
 enum MenuBuilder {
     private static let menuWidth: CGFloat = 320
 
-    static func build(appState: AppState) -> NSMenu {
-        let menu = NSMenu()
+    /// Fill a menu with the current state of the app.
+    ///
+    /// The menu itself is kept and refilled rather than replaced. Handing the
+    /// status item a new menu while the old one is open takes the open one down
+    /// with it, which on a thirty-second refresh means the menu closing under
+    /// whoever is reading it.
+    static func populate(_ menu: NSMenu, appState: AppState) {
+        menu.removeAllItems()
         menu.autoenablesItems = false
         let actions = MenuActions.shared
 
@@ -86,17 +92,8 @@ enum MenuBuilder {
         settingsItem.image?.size = NSSize(width: 14, height: 14)
         menu.addItem(settingsItem)
 
-        let refreshItem = NSMenuItem(
-            title: "Refresh Now",
-            action: #selector(MenuActions.refreshNow),
-            keyEquivalent: "r"
-        )
-        refreshItem.target = actions
-        refreshItem.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
-        refreshItem.image?.size = NSSize(width: 14, height: 14)
-        menu.addItem(refreshItem)
-
-        menu.addItem(createSSHDirectItem(appState: appState))
+        menu.addItem(createRefreshItem(actions: actions))
+        menu.addItem(createSSHDirectItem())
 
         menu.addItem(NSMenuItem.separator())
 
@@ -107,36 +104,72 @@ enum MenuBuilder {
         )
         quitItem.target = MenuActions.shared
         menu.addItem(quitItem)
+    }
 
-        return menu
+    /// Refreshing is something you do *to* the menu you are looking at, so the
+    /// menu stays up and says what it is doing instead.
+    private static func createRefreshItem(actions: MenuActions) -> NSMenuItem {
+        // The view takes the mouse, but ⌘R still goes through the item, so the
+        // action stays wired. A key equivalent closing the menu is what a key
+        // equivalent is expected to do; a click is not.
+        let item = NSMenuItem(
+            title: "Refresh Now",
+            action: #selector(MenuActions.refreshNow),
+            keyEquivalent: "r"
+        )
+        item.target = actions
+        item.view = MenuActionRow(
+            width: menuWidth,
+            content: {
+                let appState = AppState.shared
+                return MenuActionRow.Content(
+                    title: appState.isLoading ? "Refreshing…" : "Refresh Now",
+                    symbol: "arrow.clockwise",
+                    isEnabled: !appState.isLoading
+                )
+            },
+            onClick: { AppState.shared.loadSystems() }
+        )
+        return item
     }
 
     /// The switch between "ask the hub" and "ask the machines".
     ///
     /// A checkmark rather than a button that reads one way and behaves another:
-    /// the item has to say which source is live right now, not merely what
-    /// clicking it would do. Without a target to read it is inert and says why,
-    /// since a switch that appears to do nothing is worse than one that explains.
-    private static func createSSHDirectItem(appState: AppState) -> NSMenuItem {
-        let item = NSMenuItem(
-            title: "SSH Direct Mode",
-            action: #selector(MenuActions.toggleSSHDirectMode),
-            keyEquivalent: ""
+    /// the row has to say which source is live right now, not merely what clicking
+    /// it would do. Flipping it leaves the menu open, because the whole point of
+    /// flipping it is to see what the other source says. Without a target to read
+    /// it is inert and says why — a switch that appears to do nothing is worse
+    /// than one that explains itself.
+    private static func createSSHDirectItem() -> NSMenuItem {
+        let item = NSMenuItem()
+        item.view = MenuActionRow(
+            width: menuWidth,
+            content: {
+                let appState = AppState.shared
+                let toolTip: String
+                if appState.sshTargets.isEmpty {
+                    toolTip = "Add a machine under Settings → SSH first."
+                } else if appState.sshDirectModeEnabled {
+                    toolTip = "Reading each machine over SSH. The hub is not being contacted."
+                } else {
+                    toolTip = "Read each machine over SSH instead of asking the hub."
+                }
+
+                return MenuActionRow.Content(
+                    title: "SSH Direct Mode",
+                    symbol: "terminal",
+                    isChecked: appState.sshDirectModeEnabled,
+                    isEnabled: !appState.sshTargets.isEmpty,
+                    toolTip: toolTip
+                )
+            },
+            onClick: {
+                let appState = AppState.shared
+                guard !appState.sshTargets.isEmpty else { return }
+                appState.sshDirectModeEnabled.toggle()
+            }
         )
-        item.target = MenuActions.shared
-        item.state = appState.sshDirectModeEnabled ? .on : .off
-        item.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)
-        item.image?.size = NSSize(width: 14, height: 14)
-        item.isEnabled = !appState.sshTargets.isEmpty
-
-        if appState.sshTargets.isEmpty {
-            item.toolTip = "Add a machine under Settings → SSH first."
-        } else if appState.sshDirectModeEnabled {
-            item.toolTip = "Reading each machine over SSH. The hub is not being contacted."
-        } else {
-            item.toolTip = "Read each machine over SSH instead of asking the hub."
-        }
-
         return item
     }
 
