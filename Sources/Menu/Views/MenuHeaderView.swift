@@ -3,16 +3,34 @@ import SwiftUI
 struct MenuHeaderView: View {
     var appState: AppState
 
+    /// Line under the title.
+    ///
+    /// Free text so you can put your own name or team there, falling back to the
+    /// selected hub's name — which is what upstream showed — when it is not set.
+    /// Anything hardcoded here would follow every clone of this repository around.
+    private var subtitle: String? {
+        let custom = UserDefaults.standard
+            .string(forKey: "com.nohitdev.BeszelBar.headerSubtitle")?
+            .trimmingCharacters(in: .whitespaces)
+
+        if let custom = custom, !custom.isEmpty { return custom }
+
+        guard let selected = appState.selectedInstance else { return nil }
+        return selected.name.isEmpty ? selected.url : selected.name
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("BeszelBar.VO")
                         .font(.system(size: 13, weight: .semibold))
-                    Text("Osmanevski")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                    if let subtitle = subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer()

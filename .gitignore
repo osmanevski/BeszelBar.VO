@@ -1,18 +1,21 @@
-# Real infrastructure. The example config is the only one that ships.
+# Anything named *.local is yours, not the repository's.
+*.local.md
+*.local.json
 cli/hosts.local.json
 cli/hosts.json
-OPERATIONS.local.md
-*.local.md
 
 # Build output
-menubar/build/
-menubar/.build/
-menubar/BeszelBar.xcodeproj/project.xcworkspace/xcuserdata/
-menubar/BeszelBar.xcodeproj/xcuserdata/
+build/
+dist/
+.build/
 bin/
-upstream/
+*.xcworkspace/xcuserdata/
+xcuserdata/
 
-# Fetched at build time, not ours to redistribute
+# Upstream Beszel, fetched at build time and never redistributed here
 agent-patch/beszel/
 
+repos/
+.claude/
+CLAUDE*.md
 .DS_Store

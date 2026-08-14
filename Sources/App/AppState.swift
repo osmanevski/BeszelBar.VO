@@ -52,7 +52,7 @@ final class AppState {
             // only source, so use it directly rather than reporting nothing.
             if !sshTargets.isEmpty {
                 loadTask?.cancel()
-                loadTask = Task { await loadFromSSH(reason: "Hub yapılandırılmadı") }
+                loadTask = Task { await loadFromSSH(reason: "No hub configured") }
             }
             return
         }
@@ -306,14 +306,14 @@ final class AppState {
     func testSSHTarget(_ target: SSHTarget) async -> String {
         let result = await sshService.fetchAll(targets: [target])
         if let failure = result.failures[target.recordID] {
-            return "Başarısız — \(failure)"
+            return "Failed — \(failure)"
         }
         guard let system = result.systems.first, let info = system.info else {
-            return "Başarısız — okunabilir veri dönmedi"
+            return "Failed — no readable data returned"
         }
         let cpu = info.cpu.map { String(format: "%.1f%%", $0) } ?? "?"
         let mem = info.mp.map { String(format: "%.1f%%", $0) } ?? "?"
-        return "Tamam — cpu \(cpu), ram \(mem)"
+        return "OK — cpu \(cpu), ram \(mem)"
     }
 
     private func getOrCreateService(for instance: Instance) -> BeszelAPIService {

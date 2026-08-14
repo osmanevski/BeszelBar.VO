@@ -20,7 +20,7 @@ enum MenuBuilder {
         // but they arrived by a different route and they carry no history and no
         // alerts — presenting them as business as usual would be a lie of omission.
         if let reason = appState.dataSource.reason {
-            menu.addItem(createInfoItem("⚠︎ Hub erişilemiyor — SSH", subtext: reason))
+            menu.addItem(createInfoItem("⚠︎ Hub unreachable — SSH", subtext: reason))
             menu.addItem(NSMenuItem.separator())
         }
 

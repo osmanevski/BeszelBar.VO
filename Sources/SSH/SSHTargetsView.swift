@@ -13,8 +13,8 @@ struct SSHTargetsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Toggle(isOn: fallbackBinding) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Hub erişilemezse SSH'a düş")
-                            Text("Hub cevap vermediğinde bu makineler doğrudan okunur. Geçmiş ve alarm gelmez — yalnız anlık durum.")
+                            Text("Fall back to SSH when the hub is unreachable")
+                            Text("When the hub does not answer, these machines are read directly. No history and no alerts on this path — only what is happening right now.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -24,13 +24,13 @@ struct SSHTargetsView: View {
 
                     Divider()
 
-                    SectionHeader(title: "Hedefler")
+                    SectionHeader(title: "Targets")
 
                     if appState.sshTargets.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Hedef yok")
+                            Text("No targets")
                                 .foregroundColor(.secondary)
-                            Text("Her hedefte yamalı beszel-agent gerekiyor; `stats` alt komutunu destekleyen sürüm.")
+                            Text("Each target needs a patched beszel-agent — one that supports the stats subcommand.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -50,7 +50,7 @@ struct SSHTargetsView: View {
                         }
                     }
 
-                    Button("Hedef Ekle") {
+                    Button("Add Target") {
                         editingTarget = nil
                         showingSheet = true
                     }
@@ -101,9 +101,9 @@ struct SSHTargetRow: View {
 
             Spacer()
 
-            Button("Düzenle", action: onEdit)
+            Button("Edit", action: onEdit)
                 .buttonStyle(PillButtonStyle())
-            Button("Sil", action: onRemove)
+            Button("Remove", action: onRemove)
                 .buttonStyle(DestructivePillButtonStyle())
         }
         .padding(.vertical, 6)
@@ -127,13 +127,13 @@ struct SSHTargetSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(existing == nil ? "Hedef Ekle" : "Hedefi Düzenle")
+            Text(existing == nil ? "Add Target" : "Edit Target")
                 .font(.headline)
 
             Form {
-                TextField("Ad", text: $name)
+                TextField("Name", text: $name)
 
-                Picker("Bağlantı", selection: $transport) {
+                Picker("Transport", selection: $transport) {
                     ForEach(SSHTarget.Transport.allCases, id: \.self) { option in
                         Text(option.displayName).tag(option)
                     }
@@ -141,18 +141,18 @@ struct SSHTargetSheet: View {
                 .pickerStyle(.segmented)
 
                 if transport == .ssh {
-                    TextField("Kullanıcı", text: $user)
-                    TextField("Adres", text: $host)
-                    TextField("Anahtar", text: $keyPath)
+                    TextField("User", text: $user)
+                    TextField("Address", text: $host)
+                    TextField("Key", text: $keyPath)
                 }
 
-                TextField("Komut", text: $command)
+                TextField("Command", text: $command)
             }
             .formStyle(.grouped)
 
             Text(transport == .ssh
-                 ? "Anahtarı hedefte `command=\"…stats\",restrict` ile kilitlemen önerilir; o zaman bu anahtar istatistik basmaktan başka bir şey yapamaz."
-                 : "Bu Mac'te komut doğrudan çalıştırılır — SSH ve anahtar gerekmez.")
+                 ? "Lock the key to a forced command on the target with `command=\"…stats\",restrict`. It can then do nothing but print stats, even if it leaks."
+                 : "The command runs directly on this Mac — no SSH, no key.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -160,21 +160,21 @@ struct SSHTargetSheet: View {
             if let testResult = testResult {
                 Text(testResult)
                     .font(.system(size: 11))
-                    .foregroundColor(testResult.hasPrefix("Tamam") ? .green : .red)
+                    .foregroundColor(testResult.hasPrefix("OK") ? .green : .red)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack {
-                Button(isTesting ? "Deneniyor…" : "Bağlantıyı Dene") { runTest() }
+                Button(isTesting ? "Testing…" : "Test Connection") { runTest() }
                     .buttonStyle(PillButtonStyle())
                     .disabled(isTesting || !draft.isUsable)
 
                 Spacer()
 
-                Button("Vazgeç") { dismiss() }
+                Button("Cancel") { dismiss() }
                     .buttonStyle(PillButtonStyle())
 
-                Button("Kaydet") { save() }
+                Button("Save") { save() }
                     .buttonStyle(PillButtonStyle(isPrimary: true))
                     .disabled(!draft.isUsable || name.trimmingCharacters(in: .whitespaces).isEmpty)
             }

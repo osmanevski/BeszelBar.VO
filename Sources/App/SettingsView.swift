@@ -453,10 +453,31 @@ struct EditHubSheet: View {
 struct GeneralView: View {
     @AppStorage("refreshInterval") private var refreshInterval = 30
     @AppStorage("launchAtLogin") private var launchAtLogin = false
+    @AppStorage("com.nohitdev.BeszelBar.headerSubtitle") private var headerSubtitle = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                SectionHeader(title: "APPEARANCE")
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Header subtitle")
+                        Spacer()
+                        TextField("Hub name", text: $headerSubtitle)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 180)
+                    }
+                    Text("Small line under the title in the menu. Leave empty to show the selected hub's name.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+
+                Divider()
+                    .padding(.horizontal, 20)
+
                 SectionHeader(title: "SYSTEM")
 
                 VStack(alignment: .leading, spacing: 8) {

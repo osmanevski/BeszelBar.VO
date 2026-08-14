@@ -1,166 +1,161 @@
-# Nabiz
+# BeszelBar.VO
 
-A second way to see your machines, for when the first one is the thing that broke.
+A [BeszelBar](https://github.com/Loriage/BeszelBar) fork that keeps working when
+your hub does not.
 
-Nabiz does not replace [Beszel](https://github.com/henrygd/beszel). It sits beside
-it and answers when the hub cannot.
+<img src="screenshot.png" width="420" alt="BeszelBar in the macOS menu bar">
 
-## The problem
+## Why
 
-A monitoring hub is a single point of failure for the one job you cannot afford to
-lose. Everything works until the machine hosting the hub goes down — and then you
-lose the dashboard, the alerts, and any view of every *other* machine, all at the
-moment you most need to look.
+A monitoring hub is a single point of failure for the one job you cannot afford
+to lose. Everything is fine until the machine hosting the hub goes down — and
+then you lose the dashboard, the alerts, and any view of every *other* machine,
+all at once, at exactly the moment you want to look.
 
-Moving the hub elsewhere does not fix this. It relocates the blind spot. Whatever
-machine hosts the hub, that machine's death is the one death the hub cannot report.
+Moving the hub somewhere else does not fix this. It moves the blind spot.
+Whatever machine hosts the hub, that machine's death is the one death the hub
+cannot report.
 
-## The approach
+**BeszelBar.VO adds a second path with a different failure mode.** The hub stays
+primary and keeps doing what it is good at. When it stops answering, the app
+reads each machine **directly over SSH**, with no hub anywhere in the path.
 
-Give the fleet a second path with a different failure mode.
-
-The hub stays primary and keeps doing what it is good at: history, graphs, alerts,
-long-term trends. Alongside it, Nabiz reads each machine **directly over SSH**, with
-no hub anywhere in the path. When the hub is healthy you never notice. When it is
-not, you can still see every machine that is still alive — and a machine that has
-genuinely died shows up as a refused connection, which is itself the answer.
-
-What this path does *not* give you is history or alerting. Those live in the hub,
-and no amount of SSH will conjure them. It answers exactly one question: what is
-happening on these machines right now.
-
-## What is here
-
-| | |
-|---|---|
-| [`agent-patch/`](agent-patch/) | A 35-line patch adding a `stats` subcommand to the Beszel agent: sample once, print JSON, exit. |
-| [`cli/`](cli/) | A terminal client that polls every machine in parallel and prints a compact view. |
-| [`menubar/`](menubar/) | A fork of BeszelBar with automatic SSH fallback when the hub stops answering. |
-
-## Built on
-
-Nabiz is a small amount of work sitting on two projects that did the hard parts.
-Both are MIT licensed and both deserve the credit:
-
-**[henrygd/beszel](https://github.com/henrygd/beszel)** — the monitoring system:
-agent, hub, collectors, dashboard. `agent-patch/` is a patch against v0.18.7, not a
-fork; the upstream source is fetched at build time and never redistributed here.
-
-**[Loriage/BeszelBar](https://github.com/Loriage/BeszelBar)** — the macOS menu bar
-client for Beszel. `menubar/` **is** a fork, carrying upstream's source with our
-changes on top. Upstream's README, structure and build script are left intact.
-
-> BeszelBar's README declares MIT but the repository has no `LICENSE` file at the
-> time of forking. The declaration is taken at face value. If you are the author
-> and would rather this were handled differently, please open an issue.
-
-## What we changed, and why
-
-### 1. A one-shot mode for the agent
-
-Upstream's agent is a long-running process that either dials the hub over
-WebSocket or listens for the hub to connect over SSH. Both assume a hub.
-
-The patch adds a third mode that assumes nothing: run, sample, print, exit. No
-daemon, no port, no memory footprint when idle.
-
-**The trap:** `agent/cpu.go` records CPU counters in `init()`, and every reading is
-a delta against the previous sample. A one-shot process has no previous sample, so
-gathering immediately yields a delta over a few milliseconds — arithmetically fine,
-practically noise. `Snapshot()` waits a sampling window first. Memory and disk are
-point-in-time reads and do not need it.
-
-### 2. Upstream's collector, not our own
-
-Reading `/proc` ourselves would have been less work and one less patch. We call
-upstream's collector instead, deliberately.
-
-The reason is not accuracy, it is consistency. Two independent implementations of
-"percent memory used" will eventually disagree by half a point, and then somebody
-has to work out which one is wrong. Calling the same code makes that impossible:
-the numbers match the dashboard because they are computed by the dashboard's own
-collector.
-
-The remaining difference is the sampling window, not the method — a 60-second
-average looks calmer than a one-second sample of the same machine.
-
-### 3. Automatic fallback in the menu bar
-
-The fork adds an SSH data source behind the same interface the hub API already
-satisfied, so the menu did not need rewriting. The behaviour:
-
-- Hub answers → everything as upstream, SSH untouched.
-- Hub does not answer → poll the SSH targets, show live figures, and **say so** in
-  the menu. Alerts are cleared rather than left on screen going stale, because
-  alerts on this path do not exist and old ones would read as current.
+- Hub answers → identical to upstream. SSH is never contacted.
+- Hub fails → SSH targets are polled, live figures appear, and the menu says
+  **⚠︎ Hub unreachable — SSH** with the underlying error.
 - Hub recovers → back to normal on the next refresh, no intervention.
+- No hub at all → SSH works on its own, if that is all you want.
 
-It also works with no hub configured at all, if SSH is all you want.
+A machine that is genuinely down shows as **down** rather than vanishing from the
+list. A missing row reads as "nothing wrong here", which is the opposite of true.
 
-### 4. A build that does not need Xcode
+## What this path does not give you
 
-Upstream builds with XcodeGen and `xcodebuild`, which require a full Xcode install.
-`menubar/build-spm.sh` builds the same sources with the Swift compiler in the
-Command Line Tools and assembles the `.app` bundle by hand.
+**No history and no alerts.** Those live in the hub's database, and no amount of
+SSH will conjure them. This is a fallback for *sight*, not a replacement for
+monitoring. If you need to be *told* when something dies while you are asleep,
+you need a heartbeat service outside your fleet — nothing here does that.
 
-Upstream's `build.sh` is untouched and still works if you have Xcode.
+## Requirements
 
-## Getting started
+Every machine you want to reach over SSH needs a Beszel agent that supports a
+`stats` subcommand. Stock agents do not have it, so this repository ships the
+patch that adds it — 35 lines, in [`agent-patch/`](agent-patch/).
 
-**1. Build and install the patched agent** on every machine you want to reach:
+You also need the Swift toolchain from Xcode Command Line Tools
+(`xcode-select --install`). A full Xcode install is **not** required.
 
-```
+## Install
+
+**1. Build and deploy the patched agent** to each machine:
+
+```bash
 cd agent-patch && ./build.sh
-scp ../bin/beszel-agent-linux-amd64 host:/opt/beszel-agent/beszel-agent-stats
+scp ../bin/beszel-agent-linux-amd64 you@host:/opt/beszel-agent/beszel-agent-stats
 ```
 
-Install it *alongside* the running agent, not over it — no restart needed, and
-rollback is deleting a file.
+Install it *alongside* the agent already running, not over it. No service restart
+is needed and rolling back is deleting one file.
 
-**2. Lock down a key** so it can do nothing but report. On each target:
-
-```
-command="/opt/beszel-agent/beszel-agent-stats stats",restrict ssh-ed25519 AAAA... stats-readonly
-```
-
-Verify by asking for something else and watching stats come back regardless:
+**2. Create a key that can do nothing else.** On each target, add to
+`authorized_keys` (`C:\ProgramData\ssh\administrators_authorized_keys` on
+Windows):
 
 ```
-ssh -i ~/.ssh/nabiz_stats host 'whoami'    # prints JSON, not a username
+command="/opt/beszel-agent/beszel-agent-stats stats",restrict ssh-ed25519 AAAA... stats-only
 ```
 
-**3a. Terminal client:**
+`restrict` disables port forwarding, agent forwarding, pty and X11. `command=`
+runs that command and nothing else, whatever the client asks for. Confirm it took
+by asking for something different and watching stats come back anyway:
 
-```
-cd cli
-cp hosts.example.json hosts.local.json   # edit it
-./nabiz
-```
-
-**3b. Menu bar app:**
-
-```
-cd menubar && ./build-spm.sh
-open build/Release/BeszelBar.app
+```bash
+ssh -i ~/.ssh/your_key you@host 'whoami'    # prints JSON, not a username
 ```
 
-Add your machines under Settings → SSH.
+**3. Build and install the app:**
 
-## Honest limitations
+```bash
+./build-spm.sh
+cp -R build/Release/BeszelBar.app /Applications/
+open /Applications/BeszelBar.app
+```
 
-- **No history, no alerts** on the SSH path. That is the hub's job and it stays the
-  hub's job. This is a fallback for sight, not a replacement for monitoring.
-- **Containers lose detail.** Health, status and image are `json:"-"` upstream —
-  they reach the hub over CBOR only. Over SSH a container reports its name and
-  resource use; health shows as unknown rather than being invented.
-- **No temperature sensors on Windows**, unless you build with the .NET SDK. See
-  [`agent-patch/README.md`](agent-patch/README.md).
-- **Version drift.** The stats binary and the running agent are separate files. If
-  you update one, rebuild the other.
-- **The Mac has to be awake.** This is a pull model — it answers when you look. If
-  you need to be *told* when something dies, you need a heartbeat service outside
-  the fleet; nothing here does that.
+**4. Add your machines** under Settings → SSH. Each target has a *Test
+Connection* button — SSH configuration is fiddly enough that guessing is not good
+enough.
+
+> The bundle is ad-hoc signed, not notarized, so macOS will ask on first launch.
+> Right-click → Open, or build it yourself and read the source first — which is
+> rather the point of it being here.
+
+## Also included
+
+**[`cli/`](cli/)** — a terminal client that polls every machine in parallel and
+prints a compact view. Same data path, no GUI, useful over SSH or in a script.
+
+```
+  ● my-server  host.example.net
+      cpu   ████████··  82.2%   load 7.48 6.37 5.53 / 4c
+      ram   ██████····  57.1%   3.30 / 5.79 GB   swap 0.66 / 1.88 GB
+      disk  ████······  39.8%   21.7 / 57.1 GB
+```
+
+## How it works
+
+The agent patch adds a mode that assumes no hub at all: run, sample, print JSON,
+exit. No daemon, no listening port, nothing resident between polls.
+
+**It calls upstream's own collector rather than reading `/proc`.** Reading
+`/proc` would have been less work. But two independent implementations of
+"percent memory used" will eventually disagree by half a point, and then somebody
+has to work out which one is lying. Calling the same code makes that impossible:
+the numbers match the dashboard because they *are* the dashboard's numbers.
+
+What still differs is the sampling window, not the method — a 60-second average
+looks calmer than a one-second sample of the same machine.
+
+**The one-shot mode needed care.** `agent/cpu.go` records CPU counters in
+`init()`, and every reading is a delta against a previous sample. A process that
+starts and gathers immediately measures a delta over a few milliseconds:
+arithmetically valid, completely meaningless. So it waits a sampling window
+first. Memory and disk are point-in-time reads and need no wait.
+
+**The mapping was nearly free.** Upstream's `SystemInfo` uses the same short keys
+the agent emits, because the hub stores the agent's payload more or less
+verbatim. Agent JSON decodes straight into the existing model and the menu
+renders SSH-sourced data with no view changes at all.
+
+See [`FORK.md`](FORK.md) for the full diff against upstream and
+[`agent-patch/README.md`](agent-patch/README.md) for the patch.
+
+## Known limits
+
+- **Containers lose detail over SSH.** Health, status and image are `json:"-"`
+  upstream — they only reach the hub over CBOR. Health shows as unknown rather
+  than being invented.
+- **No temperature sensors on Windows** unless you build with the .NET SDK; the
+  build script writes a placeholder for the embedded component instead.
+- **Version drift.** The stats binary and the running agent are separate files.
+  Update one, rebuild the other, or they measure with different code.
+- **Pull model.** It answers when you look. Your Mac has to be awake.
+
+## Credit
+
+This is a small amount of work sitting on two projects that did the hard parts:
+
+- **[Loriage/BeszelBar](https://github.com/Loriage/BeszelBar)** — the menu bar app
+  this forks. Upstream's README is preserved as
+  [`UPSTREAM_README.md`](UPSTREAM_README.md); forked at
+  [`8a0e3c7`](https://github.com/Loriage/BeszelBar/commit/8a0e3c7123853f5c312aebd8dfaf083d584484a2).
+- **[henrygd/beszel](https://github.com/henrygd/beszel)** — the monitoring system
+  itself. Not vendored here; `agent-patch/` is a patch, and upstream source is
+  fetched at build time.
+
+> BeszelBar's README declares MIT but the repository had no `LICENSE` file at the
+> time of forking. That declaration is taken at face value. If you are the author
+> and would prefer this handled differently, please open an issue.
 
 ## License
 
-MIT. See [LICENSE](LICENSE), which carries the upstream copyright notices too.
+MIT — see [LICENSE](LICENSE), which carries both upstream copyright notices.

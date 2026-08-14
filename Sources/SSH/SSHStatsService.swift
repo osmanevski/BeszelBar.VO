@@ -24,7 +24,7 @@ final class SSHStatsService: @unchecked Sendable {
             case .commandFailed(let target, let message):
                 return "\(target): \(message)"
             case .timedOut(let target, let seconds):
-                return "\(target): \(seconds) saniyede yanıt yok"
+                return "\(target): no response in \(seconds)s"
             }
         }
     }
@@ -185,7 +185,7 @@ final class SSHStatsService: @unchecked Sendable {
                 guard process.terminationStatus == 0 else {
                     let message = String(data: stderrData, encoding: .utf8)?
                         .split(separator: "\n").last.map(String.init)
-                        ?? "çıkış kodu \(process.terminationStatus)"
+                        ?? "exit code \(process.terminationStatus)"
                     continuation.resume(
                         throwing: SSHError.commandFailed(target: target.name, message: message)
                     )

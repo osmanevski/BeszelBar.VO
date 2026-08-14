@@ -3,12 +3,21 @@
 Upstream: **[Loriage/BeszelBar](https://github.com/Loriage/BeszelBar)** — MIT,
 Copyright (c) 2025 Loriage. Forked at commit
 [`8a0e3c7`](https://github.com/Loriage/BeszelBar/commit/8a0e3c7123853f5c312aebd8dfaf083d584484a2)
-(also recorded in `UPSTREAM_COMMIT`). Upstream's `README.md`, project layout and
-`build.sh` are left as they were; this file describes only what was added on top.
+(also recorded in `UPSTREAM_COMMIT`). Upstream's project layout, `build.sh` and
+`project.yml` are left as they were, and its README is preserved verbatim as
+`UPSTREAM_README.md`. This file describes only what was added on top.
 
-Upstream's `.github/FUNDING.yml` was removed. Leaving it in place would put a
-sponsor button on this fork soliciting on the original author's behalf, which is
-not this repository's to display. Credit is given in the README and the LICENSE.
+Three things were removed, all for the same reason — they belong to the original
+author, not to a fork:
+
+- `.github/FUNDING.yml` would put a sponsor button on this repository soliciting
+  on their behalf.
+- `homebrew/Casks/beszelbar.rb.template` and `scripts/release-cask.sh` publish to
+  their Homebrew tap.
+- `scripts/sign-and-notarize.sh` signs with their Developer ID.
+
+None of them could work here, and leaving scripts around that cannot work invites
+someone to run them. Credit is given in the README and the LICENSE instead.
 
 ## Why
 
@@ -69,7 +78,7 @@ a safety net.
 ## Requirements
 
 Every target needs an agent supporting the `stats` subcommand — see
-[`../agent-patch/`](../agent-patch/). Stock Beszel agents do not have it.
+[`agent-patch/`](agent-patch/). Stock Beszel agents do not have it.
 
 ## Building without Xcode
 
