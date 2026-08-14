@@ -26,6 +26,11 @@ reads each machine **directly over SSH**, with no hub anywhere in the path.
 - Hub recovers → back to normal on the next refresh, no intervention.
 - No hub at all → SSH works on its own, if that is all you want.
 
+You can also take the second path deliberately: **SSH Direct Mode**, in the menu
+under *Refresh Now*, stops the hub being contacted at all until you switch it
+back. The menu names whichever source is live, so the two are never confused —
+one is something breaking, the other is a mode you chose.
+
 A machine that is genuinely down shows as **down** rather than vanishing from the
 list. A missing row reads as "nothing wrong here", which is the opposite of true.
 

@@ -24,6 +24,19 @@ final class AppState {
     var sshTargets: [SSHTarget] = []
     var sshFailures: [String: String] = [:]
 
+    /// Read the machines directly and leave the hub out of it entirely.
+    ///
+    /// Distinct from the fallback, which reacts to a hub that stopped answering.
+    /// This is the user saying "do not ask the hub at all", so it holds even while
+    /// the hub is perfectly healthy, and it survives relaunches.
+    var sshDirectModeEnabled: Bool {
+        didSet {
+            guard sshDirectModeEnabled != oldValue else { return }
+            sshStore.directModeEnabled = sshDirectModeEnabled
+            applyDirectModeChange()
+        }
+    }
+
     private let storage = StorageManager()
     private let keychain = KeychainService.shared
     private let sshStore = SSHTargetStore()
@@ -35,6 +48,7 @@ final class AppState {
     private var containerTask: Task<Void, Never>?
 
     private init() {
+        sshDirectModeEnabled = sshStore.directModeEnabled
         loadInstances()
         sshTargets = sshStore.loadTargets()
         isConfigured = !instances.isEmpty || !sshTargets.isEmpty
@@ -47,12 +61,26 @@ final class AppState {
     }
 
     func loadSystems() {
+        // The user asked for SSH, so the hub is not consulted at all — not even
+        // to discover that it is fine. Nothing here can flip the app back to the
+        // hub; only turning the mode off does that.
+        if sshDirectModeEnabled && !sshTargets.isEmpty {
+            // Recorded now rather than when the readings land. The three hub-only
+            // loaders decide what to do by reading this, and for the second or two
+            // a first SSH collection takes they would otherwise still consider the
+            // hub fair game — which is exactly what the mode exists to prevent.
+            dataSource = .sshDirect
+            loadTask?.cancel()
+            loadTask = Task { await loadFromSSH(source: .sshDirect) }
+            return
+        }
+
         guard let instance = selectedInstance else {
             // No hub configured at all. SSH is not a fallback here, it is the
             // only source, so use it directly rather than reporting nothing.
             if !sshTargets.isEmpty {
                 loadTask?.cancel()
-                loadTask = Task { await loadFromSSH(reason: "No hub configured") }
+                loadTask = Task { await loadFromSSH(source: .ssh(reason: "No hub configured")) }
             }
             return
         }
@@ -79,7 +107,7 @@ final class AppState {
                 // The hub did not answer. This is the case the fork exists for:
                 // rather than leaving the menu empty, go straight to the machines.
                 if sshFallbackEnabled && !sshTargets.isEmpty {
-                    await loadFromSSH(reason: error.localizedDescription)
+                    await loadFromSSH(source: .ssh(reason: error.localizedDescription))
                 } else {
                     errorMessage = error.localizedDescription
                     dataSource = .hub
@@ -89,7 +117,11 @@ final class AppState {
     }
 
     /// Populate everything from the machines themselves, bypassing the hub.
-    private func loadFromSSH(reason: String) async {
+    ///
+    /// The source travels in rather than being derived here, because the same
+    /// collection means two different things: a fallback carries the hub's error,
+    /// direct mode carries no fault at all.
+    private func loadFromSSH(source: DataSource) async {
         isLoading = true
         defer { isLoading = false }
 
@@ -100,12 +132,14 @@ final class AppState {
         systemDetails = result.details
         containers = result.containers
         sshFailures = result.failures
-        dataSource = .ssh(reason: reason)
+        dataSource = source
 
         // Alerts live in the hub's database, so there are none to show on this
         // path. Leaving stale ones on screen would imply they are still current.
         activeAlerts = []
-        errorMessage = result.systems.isEmpty ? reason : nil
+        errorMessage = result.systems.isEmpty
+            ? (source.reason ?? "No usable SSH targets")
+            : nil
     }
 
     func loadSystemDetails() {
@@ -272,10 +306,31 @@ final class AppState {
             sshStore.fallbackEnabled = newValue
             // Turning it off while it is carrying the app would leave stale numbers
             // on screen, so go back to the hub and let it report its own state.
-            if !newValue, !dataSource.isHub {
+            // Only the fallback is undone here: direct mode was asked for, and
+            // switching off a safety net is no reason to overrule that.
+            if !newValue, dataSource.reason != nil {
                 dataSource = .hub
                 loadSystems()
             }
+        }
+    }
+
+    /// Act on the mode having been switched.
+    ///
+    /// Turning it off has more to do than turning it on: the three hub-only
+    /// loaders sat out the whole time SSH was carrying the app, so the details,
+    /// alerts and containers on screen are all from the other path and have to be
+    /// fetched again rather than waiting for whichever timer happens to fire.
+    private func applyDirectModeChange() {
+        if sshDirectModeEnabled {
+            loadSystems()
+        } else {
+            dataSource = .hub
+            sshFailures = [:]
+            loadSystems()
+            loadSystemDetails()
+            loadAlerts()
+            loadContainers()
         }
     }
 
@@ -283,6 +338,7 @@ final class AppState {
         sshTargets.append(target)
         sshStore.saveTargets(sshTargets)
         isConfigured = true
+        if sshDirectModeEnabled { loadSystems() }
     }
 
     func updateSSHTarget(_ target: SSHTarget) {
@@ -296,8 +352,17 @@ final class AppState {
         sshTargets.removeAll { $0.id == target.id }
         sshStore.saveTargets(sshTargets)
         sshFailures.removeValue(forKey: target.recordID)
-        if !dataSource.isHub { loadSystems() }
         isConfigured = !instances.isEmpty || !sshTargets.isEmpty
+
+        // A direct mode with nothing left to read is a mode that can only report
+        // emptiness, so removing the last target ends it. Its didSet returns the
+        // app to the hub, which makes the further reload below unnecessary.
+        if sshDirectModeEnabled && sshTargets.isEmpty {
+            sshDirectModeEnabled = false
+            return
+        }
+
+        if !dataSource.isHub { loadSystems() }
     }
 
     /// Run one target now and report what came back, for the settings screen's

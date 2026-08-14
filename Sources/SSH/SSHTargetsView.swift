@@ -11,6 +11,18 @@ struct SSHTargetsView: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    Toggle(isOn: directModeBinding) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("SSH Direct Mode")
+                            Text("Read these machines over SSH and do not contact the hub at all. Also on the menu, under Refresh Now.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .disabled(appState.sshTargets.isEmpty)
+
                     Toggle(isOn: fallbackBinding) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Fall back to SSH when the hub is unreachable")
@@ -21,6 +33,8 @@ struct SSHTargetsView: View {
                         }
                     }
                     .toggleStyle(.switch)
+                    // Nothing to fall back from while the hub is already bypassed.
+                    .disabled(appState.sshDirectModeEnabled)
 
                     Divider()
 
@@ -69,6 +83,13 @@ struct SSHTargetsView: View {
         Binding(
             get: { appState.sshFallbackEnabled },
             set: { appState.sshFallbackEnabled = $0 }
+        )
+    }
+
+    private var directModeBinding: Binding<Bool> {
+        Binding(
+            get: { appState.sshDirectModeEnabled },
+            set: { appState.sshDirectModeEnabled = $0 }
         )
     }
 }

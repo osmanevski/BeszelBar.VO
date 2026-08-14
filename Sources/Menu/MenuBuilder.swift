@@ -19,8 +19,19 @@ enum MenuBuilder {
         // Say plainly when the hub is out of the picture. These readings are live,
         // but they arrived by a different route and they carry no history and no
         // alerts — presenting them as business as usual would be a lie of omission.
-        if let reason = appState.dataSource.reason {
+        // Chosen and imposed are both worth saying, and they are not the same news:
+        // one is a mode the user turned on, the other is something breaking.
+        switch appState.dataSource {
+        case .hub:
+            break
+        case .ssh(let reason):
             menu.addItem(createInfoItem("⚠︎ Hub unreachable — SSH", subtext: reason))
+            menu.addItem(NSMenuItem.separator())
+        case .sshDirect:
+            menu.addItem(createInfoItem(
+                "SSH Direct — hub bypassed",
+                subtext: "Read from each machine. No history, no alerts."
+            ))
             menu.addItem(NSMenuItem.separator())
         }
 
@@ -36,7 +47,12 @@ enum MenuBuilder {
             item.isEnabled = false
             menu.addItem(item)
         } else if appState.selectedInstanceSystems.isEmpty {
-            menu.addItem(createInfoItem("No Systems Found", subtext: "Check your hub configuration"))
+            menu.addItem(createInfoItem(
+                "No Systems Found",
+                subtext: appState.dataSource.isHub
+                    ? "Check your hub configuration"
+                    : "Check your SSH targets"
+            ))
         } else {
             for system in appState.selectedInstanceSystems.prefix(15) {
                 let item = createSystemItem(for: system, appState: appState)
@@ -80,6 +96,8 @@ enum MenuBuilder {
         refreshItem.image?.size = NSSize(width: 14, height: 14)
         menu.addItem(refreshItem)
 
+        menu.addItem(createSSHDirectItem(appState: appState))
+
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
@@ -91,6 +109,35 @@ enum MenuBuilder {
         menu.addItem(quitItem)
 
         return menu
+    }
+
+    /// The switch between "ask the hub" and "ask the machines".
+    ///
+    /// A checkmark rather than a button that reads one way and behaves another:
+    /// the item has to say which source is live right now, not merely what
+    /// clicking it would do. Without a target to read it is inert and says why,
+    /// since a switch that appears to do nothing is worse than one that explains.
+    private static func createSSHDirectItem(appState: AppState) -> NSMenuItem {
+        let item = NSMenuItem(
+            title: "SSH Direct Mode",
+            action: #selector(MenuActions.toggleSSHDirectMode),
+            keyEquivalent: ""
+        )
+        item.target = MenuActions.shared
+        item.state = appState.sshDirectModeEnabled ? .on : .off
+        item.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)
+        item.image?.size = NSSize(width: 14, height: 14)
+        item.isEnabled = !appState.sshTargets.isEmpty
+
+        if appState.sshTargets.isEmpty {
+            item.toolTip = "Add a machine under Settings → SSH first."
+        } else if appState.sshDirectModeEnabled {
+            item.toolTip = "Reading each machine over SSH. The hub is not being contacted."
+        } else {
+            item.toolTip = "Read each machine over SSH instead of asking the hub."
+        }
+
+        return item
     }
 
     private static func createHubSwitcherSubmenu(appState: AppState) -> NSMenuItem {

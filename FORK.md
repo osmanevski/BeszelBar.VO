@@ -42,9 +42,11 @@ Changes to upstream files were kept as small as possible:
 
 | File | Change |
 |---|---|
-| `App/AppState.swift` | Fallback logic in `loadSystems()`, `loadFromSSH()`, SSH target management, and a `dataSource` guard on the three hub-only loaders. |
+| `App/AppState.swift` | Fallback logic in `loadSystems()`, `loadFromSSH()`, SSH target management, the `sshDirectModeEnabled` switch, and a `dataSource` guard on the three hub-only loaders. |
 | `App/SettingsView.swift` | One new tab case. |
-| `Menu/MenuBuilder.swift` | A banner when SSH is carrying the app; the empty state now accounts for SSH-only setups. |
+| `Menu/MenuBuilder.swift` | A banner naming whichever source is live; the **SSH Direct Mode** item under *Refresh Now*; the empty state now accounts for SSH-only setups. |
+| `Menu/MenuActions.swift` | `toggleSSHDirectMode`. |
+| `App/AppDelegate.swift` | Two more properties tracked, so the menu redraws when the source or the mode changes. |
 | `Menu/Views/MenuHeaderView.swift` | Title and subtitle. |
 | `App/SettingsView.swift` (About) | Points at this fork; the original author's copyright notice stays. |
 
@@ -80,6 +82,27 @@ Two places where it is not free, both handled honestly rather than papered over:
 
 The fallback defaults to **on**. A safety net nobody remembered to enable is not
 a safety net.
+
+## Two ways to end up on SSH
+
+The fallback above reacts to a hub that stopped answering. **SSH Direct Mode** is
+the other reason to be on this path: the user asked. It sits in the menu under
+*Refresh Now*, and on the Settings → SSH pane beside the fallback switch.
+
+- Turning it on stops the hub being contacted at all — not even to find out
+  whether it is healthy. Nothing can turn it back off but you.
+- The menu says which of the two is live: **⚠︎ Hub unreachable — SSH** carries the
+  hub's error, **SSH Direct — hub bypassed** carries none, because nothing broke.
+  Both say the same thing about history and alerts, which are missing either way.
+- It defaults to **off** and stays where you left it. The opposite default to the
+  fallback, for the opposite reason: silently bypassing a working hub would cost
+  history and alerts with nobody having asked for that.
+- The item is inert with no targets configured, and removing the last target ends
+  the mode — a direct mode with nothing to read can only report emptiness.
+
+Switching it off refetches details, alerts and containers rather than waiting for
+a timer. Those three sit out the whole time SSH is carrying the app, so what is on
+screen at that moment all came from the other path.
 
 ## Requirements
 

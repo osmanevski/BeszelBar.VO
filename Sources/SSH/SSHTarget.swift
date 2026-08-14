@@ -77,6 +77,10 @@ enum DataSource: Equatable {
     /// Carrying the app because the hub did not answer. The reason travels with
     /// the case so the menu can say what went wrong instead of just "degraded".
     case ssh(reason: String)
+    /// Carrying the app because the user asked for it. Nothing went wrong, so
+    /// this is reported as a mode rather than as a fault — but it is still worth
+    /// saying, because history and alerts are missing here too.
+    case sshDirect
 
     var isHub: Bool {
         if case .hub = self { return true }
@@ -98,6 +102,7 @@ final class SSHTargetStore {
     private let defaults = UserDefaults.standard
     private let targetsKey = "com.nohitdev.BeszelBar.sshTargets"
     private let fallbackEnabledKey = "com.nohitdev.BeszelBar.sshFallbackEnabled"
+    private let directModeKey = "com.nohitdev.BeszelBar.sshDirectMode"
 
     func loadTargets() -> [SSHTarget] {
         guard let data = defaults.data(forKey: targetsKey),
@@ -120,5 +125,15 @@ final class SSHTargetStore {
             return defaults.bool(forKey: fallbackEnabledKey)
         }
         set { defaults.set(newValue, forKey: fallbackEnabledKey) }
+    }
+
+    /// Defaults to off, and stays where the user left it across launches.
+    ///
+    /// The opposite of `fallbackEnabled`: this one is a deliberate choice to stop
+    /// using the hub, so it must never turn itself on. Silently bypassing a
+    /// working hub would cost history and alerts with nobody having asked.
+    var directModeEnabled: Bool {
+        get { defaults.bool(forKey: directModeKey) }
+        set { defaults.set(newValue, forKey: directModeKey) }
     }
 }

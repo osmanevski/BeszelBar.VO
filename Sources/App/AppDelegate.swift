@@ -45,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         _ = AppState.shared.dataSource
                         _ = AppState.shared.sshTargets
                         _ = AppState.shared.sshFailures
+                        // The checkmark has to move the moment it is clicked,
+                        // before the first SSH reading has come back.
+                        _ = AppState.shared.sshDirectModeEnabled
                     } onChange: {
                         continuation.resume()
                     }
