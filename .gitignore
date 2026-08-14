@@ -1,0 +1,18 @@
+# Real infrastructure. The example config is the only one that ships.
+cli/hosts.local.json
+cli/hosts.json
+OPERATIONS.local.md
+*.local.md
+
+# Build output
+menubar/build/
+menubar/.build/
+menubar/BeszelBar.xcodeproj/project.xcworkspace/xcuserdata/
+menubar/BeszelBar.xcodeproj/xcuserdata/
+bin/
+upstream/
+
+# Fetched at build time, not ours to redistribute
+agent-patch/beszel/
+
+.DS_Store

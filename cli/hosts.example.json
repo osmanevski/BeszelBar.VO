@@ -1,0 +1,28 @@
+{
+  "_comment": "Copy to hosts.local.json and edit. 'transport': local runs the command on this machine, ssh runs it on the far end. Point 'key' at a key locked to a forced stats command on the target — see the repository README. There is deliberately no fallback key: falling back to a full-privilege key would quietly undo that, and a failure here should be visible rather than papered over.",
+  "ssh_control_persist": "300",
+  "timeout_seconds": 12,
+  "hosts": [
+    {
+      "name": "My Linux Server",
+      "transport": "ssh",
+      "user": "root",
+      "addr": "10.0.0.1",
+      "key": "~/.ssh/nabiz_stats",
+      "command": "/opt/beszel-agent/beszel-agent-stats stats"
+    },
+    {
+      "name": "My Windows Server",
+      "transport": "ssh",
+      "user": "administrator",
+      "addr": "10.0.0.2",
+      "key": "~/.ssh/nabiz_stats",
+      "command": "C:\\beszel\\beszel-agent-stats.exe stats"
+    },
+    {
+      "name": "This Mac",
+      "transport": "local",
+      "command": "~/.local/bin/beszel-agent-stats stats"
+    }
+  ]
+}

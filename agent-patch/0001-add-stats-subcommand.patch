@@ -1,0 +1,108 @@
+diff --git a/agent/snapshot.go b/agent/snapshot.go
+new file mode 100644
+index 0000000..b616b11
+--- /dev/null
++++ b/agent/snapshot.go
+@@ -0,0 +1,31 @@
++package agent
++
++import (
++	"time"
++
++	"github.com/henrygd/beszel/internal/common"
++	"github.com/henrygd/beszel/internal/entities/system"
++)
++
++// DefaultSnapshotWindow is how long Snapshot waits before gathering, so that
++// delta-based metrics (cpu, network and disk I/O) have a meaningful interval.
++const DefaultSnapshotWindow = time.Second
++
++// Snapshot collects a single round of system stats and returns it.
++//
++// It exists for one-shot invocations that have no hub connection: the process
++// starts, samples once, prints and exits. The cpu, network and disk figures are
++// deltas against the counters recorded when the package was initialized, so a
++// process that gathers immediately would report a window of a few milliseconds.
++// Waiting for sampleWindow first gives those counters something to subtract.
++//
++// Memory and disk usage are point-in-time reads and are unaffected by the wait.
++func (a *Agent) Snapshot(sampleWindow time.Duration) *system.CombinedData {
++	if sampleWindow > 0 {
++		time.Sleep(sampleWindow)
++	}
++	return a.gatherStats(common.DataRequestOptions{
++		CacheTimeMs:    defaultDataCacheTimeMs,
++		IncludeDetails: true,
++	})
++}
+diff --git a/internal/cmd/agent/agent.go b/internal/cmd/agent/agent.go
+index a27908d..558a7d5 100644
+--- a/internal/cmd/agent/agent.go
++++ b/internal/cmd/agent/agent.go
+@@ -1,10 +1,12 @@
+ package main
+ 
+ import (
++	"encoding/json"
+ 	"fmt"
+ 	"log"
+ 	"os"
+ 	"strings"
++	"time"
+ 
+ 	"github.com/henrygd/beszel"
+ 	"github.com/henrygd/beszel/agent"
+@@ -42,6 +44,9 @@ func (opts *cmdOptions) parse() bool {
+ 	case "fingerprint":
+ 		handleFingerprint()
+ 		return true
++	case "stats":
++		handleStats()
++		return true
+ 	}
+ 
+ 	// pflag.CommandLine.ParseErrorsWhitelist.UnknownFlags = true
+@@ -77,6 +82,7 @@ func (opts *cmdOptions) parse() bool {
+ 		builder.WriteString("\nCommands:\n")
+ 		builder.WriteString("  fingerprint  View or reset the agent fingerprint\n")
+ 		builder.WriteString("  health       Check if the agent is running\n")
++		builder.WriteString("  stats        Print one round of system stats as JSON and exit\n")
+ 		builder.WriteString("  update       Update to the latest version\n")
+ 		builder.WriteString("\nFlags:\n")
+ 		fmt.Print(builder.String())
+@@ -166,6 +172,35 @@ func handleFingerprint() {
+ 	}
+ }
+ 
++// handleStats handles the "stats" command: gather one round of system stats,
++// write them to stdout as JSON and exit. This is the path used by clients that
++// reach the machine directly over SSH rather than through the hub, so it must
++// not open a port, connect to a hub, or leave a process behind.
++//
++// An optional second argument overrides the sampling window, e.g. "stats 2s".
++func handleStats() {
++	window := agent.DefaultSnapshotWindow
++	if len(os.Args) > 2 {
++		parsed, err := time.ParseDuration(os.Args[2])
++		if err != nil {
++			log.Fatalf("Invalid sample window %q: %v", os.Args[2], err)
++		}
++		window = parsed
++	}
++
++	a, err := agent.NewAgent()
++	if err != nil {
++		log.Fatal("Failed to create agent: ", err)
++	}
++
++	// Logs go to stderr, so stdout carries nothing but the JSON document.
++	encoder := json.NewEncoder(os.Stdout)
++	encoder.SetIndent("", "  ")
++	if err := encoder.Encode(a.Snapshot(window)); err != nil {
++		log.Fatal("Failed to encode stats: ", err)
++	}
++}
++
+ func fingerprintUsage() string {
+ 	return fmt.Sprintf("Usage: %s fingerprint [view|reset]\n\nCommands:\n  view   Print fingerprint (default)\n  reset  Reset saved fingerprint\n", os.Args[0])
+ }

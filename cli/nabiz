@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""Nabiz — read live machine stats over SSH, without the Beszel hub.
+
+Each host runs a patched beszel-agent that supports a `stats` subcommand: it
+samples once, prints JSON to stdout and exits. Nothing listens, nothing stays
+resident, and no hub is involved. That is the point — this path still answers
+when the hub, or the machine hosting it, is down.
+
+The numbers come from Beszel's own collector, so they use the same formulas as
+the panel (memory is MemAvailable-based, cpu is a delta over the sample window).
+The sample window differs from the panel's, so figures move around more than the
+dashboard does; the method behind them is identical.
+"""
+
+import concurrent.futures
+import json
+import os
+import subprocess
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+# Real addresses live in hosts.local.json, which is gitignored. Only the example
+# ships in the repo, so a clone never carries somebody else's infrastructure.
+CONFIG_CANDIDATES = [
+    os.path.join(HERE, "hosts.local.json"),
+    os.path.join(HERE, "hosts.json"),
+]
+
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+RED = "\033[31m"
+YELLOW = "\033[33m"
+GREEN = "\033[32m"
+CYAN = "\033[36m"
+
+# Percentages at or above these light up.
+WARN_PCT = 75.0
+CRIT_PCT = 90.0
+
+
+def colorize(text, color):
+    if not sys.stdout.isatty():
+        return text
+    return f"{color}{text}{RESET}"
+
+
+def pct_color(pct):
+    if pct >= CRIT_PCT:
+        return RED
+    if pct >= WARN_PCT:
+        return YELLOW
+    return GREEN
+
+
+def expand(path):
+    return os.path.expanduser(path) if path else path
+
+
+def ssh_argv(host, key, control_persist):
+    """Build the ssh command for a host.
+
+    ControlMaster keeps the connection warm between calls, which takes a repeat
+    poll from a few hundred milliseconds down to tens of them — the difference
+    between a menu bar that feels live and one that stutters.
+    """
+    return [
+        "ssh",
+        "-o", "BatchMode=yes",
+        "-o", "ConnectTimeout=8",
+        "-o", "IdentitiesOnly=yes",
+        "-o", "ControlMaster=auto",
+        "-o", f"ControlPath={expand('~/.ssh/nabiz-%r@%h:%p')}",
+        "-o", f"ControlPersist={control_persist}",
+        "-i", expand(key),
+        f"{host['user']}@{host['addr']}",
+        host["command"],
+    ]
+
+
+def run(argv, timeout):
+    proc = subprocess.run(
+        argv,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=timeout,
+    )
+    return proc
+
+
+def collect(host, timeout, control_persist):
+    """Fetch one host. Returns (host, data, error, elapsed_seconds)."""
+    started = time.monotonic()
+
+    try:
+        if host["transport"] == "local":
+            argv = [expand(host["command"].split()[0])] + host["command"].split()[1:]
+            proc = run(argv, timeout)
+        else:
+            proc = run(ssh_argv(host, host["key"], control_persist), timeout)
+            # The restricted key is only valid once it is in authorized_keys on
+            # the far end. Until then, fall back so the tool still works.
+            if proc.returncode != 0 and host.get("fallback_key"):
+                proc = run(
+                    ssh_argv(host, host["fallback_key"], control_persist), timeout
+                )
+    except subprocess.TimeoutExpired:
+        return host, None, f"timeout after {timeout}s", time.monotonic() - started
+    except FileNotFoundError as exc:
+        return host, None, str(exc), time.monotonic() - started
+
+    elapsed = time.monotonic() - started
+
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", "replace").strip().splitlines()
+        message = detail[-1] if detail else f"exit code {proc.returncode}"
+        return host, None, message, elapsed
+
+    try:
+        return host, json.loads(proc.stdout.decode("utf-8", "replace")), None, elapsed
+    except json.JSONDecodeError as exc:
+        return host, None, f"bad JSON: {exc}", elapsed
+
+
+def fmt_uptime(seconds):
+    if not seconds:
+        return "?"
+    seconds = int(seconds)
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes = rem // 60
+    if days:
+        return f"{days}g {hours}s"
+    if hours:
+        return f"{hours}s {minutes}d"
+    return f"{minutes}d"
+
+
+def bar(pct, width=10):
+    filled = int(round(pct / 100 * width))
+    filled = max(0, min(width, filled))
+    return "█" * filled + "·" * (width - filled)
+
+
+def render(results):
+    now = time.strftime("%H:%M:%S")
+    print()
+    print(f"  {colorize('NABIZ', BOLD + CYAN)}  {colorize(now, DIM)}  "
+          f"{colorize('(hub yok — dogrudan SSH)', DIM)}")
+    print()
+
+    for host, data, error, elapsed in results:
+        name = host["name"]
+
+        if error:
+            print(f"  {colorize('●', RED)} {colorize(name, BOLD)}")
+            print(f"      {colorize(error, RED)}")
+            print()
+            continue
+
+        stats = data.get("stats", {})
+        info = data.get("info", {})
+        details = data.get("Details") or {}
+
+        cpu = stats.get("cpu", 0.0)
+        mem_pct = stats.get("mp", 0.0)
+        mem_used = stats.get("mu", 0.0)
+        mem_total = stats.get("m", 0.0)
+        disk_pct = stats.get("dp", 0.0)
+        disk_used = stats.get("du", 0.0)
+        disk_total = stats.get("d", 0.0)
+        swap_used = stats.get("su", 0.0)
+        swap_total = stats.get("s", 0.0)
+        load = stats.get("la") or info.get("la") or []
+        cores = details.get("Cores") or info.get("c") or 0
+        threads = details.get("Threads") or info.get("t") or 0
+
+        worst = max(cpu, mem_pct, disk_pct)
+        dot = colorize("●", pct_color(worst))
+        host_label = details.get("Hostname") or ""
+        suffix = f"  {colorize(host_label, DIM)}" if host_label else ""
+        print(f"  {dot} {colorize(name, BOLD)}{suffix}")
+
+        print(f"      cpu   {colorize(bar(cpu), pct_color(cpu))} "
+              f"{colorize(f'{cpu:5.1f}%', pct_color(cpu))}", end="")
+        if load:
+            load_str = " ".join(f"{x:.2f}" for x in load[:3])
+            per_core = f" / {cores}c" if cores else ""
+            print(f"   {colorize(f'load {load_str}{per_core}', DIM)}")
+        else:
+            print()
+
+        print(f"      ram   {colorize(bar(mem_pct), pct_color(mem_pct))} "
+              f"{colorize(f'{mem_pct:5.1f}%', pct_color(mem_pct))}"
+              f"   {colorize(f'{mem_used:.2f} / {mem_total:.2f} GB', DIM)}", end="")
+        if swap_total:
+            swap_note = f"   swap {swap_used:.2f} / {swap_total:.2f} GB"
+            colored = YELLOW if swap_used > 0.1 else DIM
+            print(colorize(swap_note, colored))
+        else:
+            print()
+
+        print(f"      disk  {colorize(bar(disk_pct), pct_color(disk_pct))} "
+              f"{colorize(f'{disk_pct:5.1f}%', pct_color(disk_pct))}"
+              f"   {colorize(f'{disk_used:.1f} / {disk_total:.1f} GB', DIM)}")
+
+        meta = [f"up {fmt_uptime(info.get('u'))}"]
+        if threads:
+            meta.append(f"{threads} thread")
+        containers = data.get("container") or []
+        if containers:
+            meta.append(f"{len(containers)} konteyner")
+        services = info.get("sv") or []
+        if len(services) == 2:
+            total, failed = services
+            label = f"{total} servis"
+            if failed:
+                label += f" ({failed} basarisiz)"
+            meta.append(label)
+        meta.append(f"{elapsed:.1f}s")
+        print(f"      {colorize(' · '.join(meta), DIM)}")
+        print()
+
+
+def load_config():
+    for candidate in CONFIG_CANDIDATES:
+        if os.path.exists(candidate):
+            with open(candidate) as handle:
+                return json.load(handle)
+
+    names = " or ".join(os.path.basename(path) for path in CONFIG_CANDIDATES)
+    raise SystemExit(
+        f"No config found. Copy hosts.example.json to {names} and fill in your hosts."
+    )
+
+
+def main():
+    config = load_config()
+
+    hosts = config["hosts"]
+    timeout = config.get("timeout_seconds", 12)
+    control_persist = config.get("ssh_control_persist", "300")
+
+    if "--json" in sys.argv:
+        payload = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as pool:
+            futures = [
+                pool.submit(collect, host, timeout, control_persist) for host in hosts
+            ]
+            for future in futures:
+                host, data, error, _ = future.result()
+                payload[host["name"]] = {"error": error} if error else data
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    # Hosts are polled in parallel: total wall time is the slowest host, not the
+    # sum. Each one spends about a second sampling, so serial polling would make
+    # a three-machine view feel sluggish for no reason.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as pool:
+        futures = [
+            pool.submit(collect, host, timeout, control_persist) for host in hosts
+        ]
+        results = [future.result() for future in futures]
+
+    # Keep the configured order rather than completion order, so the display
+    # does not shuffle between refreshes.
+    order = {host["name"]: index for index, host in enumerate(hosts)}
+    results.sort(key=lambda item: order[item[0]["name"]])
+
+    render(results)
+    return 1 if any(error for _, _, error, _ in results) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
