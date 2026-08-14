@@ -145,3 +145,9 @@ Developer ID signature, so Gatekeeper will still prompt on first launch.
 The one thing it gives up is the compiled asset catalog — `actool` ships with
 Xcode — so the icon is built with `iconutil` instead. For a menu bar app that
 icon is rarely seen.
+
+Output goes to `.dist/`, not upstream's `build/Release/`. Spotlight indexes any
+`.app` bundle it can see, so a build sitting in a visible directory means the app
+matches twice in search — the installed copy and the build output — and picking
+the wrong one runs stale code. Spotlight skips dot directories. `--install` copies
+the bundle to `/Applications`, stopping a running instance first.

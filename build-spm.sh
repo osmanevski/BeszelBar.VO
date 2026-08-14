@@ -11,6 +11,8 @@
 # app (LSUIElement) that icon is barely seen anyway.
 #
 # Use upstream's build.sh instead if you do have Xcode.
+#
+# Pass --install to copy the finished bundle into /Applications.
 
 set -euo pipefail
 
@@ -20,8 +22,20 @@ APP_NAME="BeszelBar"
 BUNDLE_ID="com.nohitdev.BeszelBar"
 VERSION="1.0.1"
 BUILD_NUMBER="2"
-OUT_DIR="build/Release"
+# A dot directory, not build/, on purpose. Spotlight indexes app bundles
+# wherever it finds them, so a visible copy here means "beszelbar" matches twice
+# in search — once from /Applications and once from the build output. Spotlight
+# skips dot directories, upstream's build/ is left to upstream's build.sh.
+OUT_DIR=".dist"
 APP_DIR="${OUT_DIR}/${APP_NAME}.app"
+
+INSTALL=0
+for arg in "$@"; do
+    case "$arg" in
+        --install) INSTALL=1 ;;
+        *) echo "Unknown argument: $arg" >&2; exit 2 ;;
+    esac
+done
 
 echo "==> Compiling (release)"
 swift build -c release
@@ -115,4 +129,19 @@ codesign --force --deep --sign - "$APP_DIR" 2>/dev/null \
 
 echo
 echo "Built: ${APP_DIR}"
-echo "Run:   open ${APP_DIR}"
+
+if [[ "$INSTALL" -eq 1 ]]; then
+    DEST="/Applications/${APP_NAME}.app"
+    echo "==> Installing to ${DEST}"
+    # Replacing a bundle underneath a running process leaves it running on
+    # deleted code, so stop it first.
+    pkill -f "${APP_NAME}.app/Contents/MacOS/${APP_NAME}" 2>/dev/null && sleep 1 || true
+    rm -rf "$DEST"
+    cp -R "$APP_DIR" /Applications/
+    echo "    installed"
+    echo
+    echo "Run:   open ${DEST}"
+else
+    echo "Run:   open ${APP_DIR}"
+    echo "       ./build-spm.sh --install   # to put it in /Applications"
+fi

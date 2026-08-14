@@ -83,10 +83,13 @@ ssh -i ~/.ssh/your_key you@host 'whoami'    # prints JSON, not a username
 **3. Build and install the app:**
 
 ```bash
-./build-spm.sh
-cp -R build/Release/BeszelBar.app /Applications/
+./build-spm.sh --install
 open /Applications/BeszelBar.app
 ```
+
+Without `--install` the bundle stays in `.dist/` and you can run it from there.
+It lives in a dot directory so Spotlight doesn't index it — otherwise searching
+for the app turns up two copies, the installed one and the build output.
 
 **4. Add your machines** under Settings → SSH. Each target has a *Test
 Connection* button — SSH configuration is fiddly enough that guessing is not good
