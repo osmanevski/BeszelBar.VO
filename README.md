@@ -51,8 +51,10 @@ You also need the Swift toolchain from Xcode Command Line Tools
 
 ```bash
 cd agent-patch && ./build.sh
-scp ../bin/beszel-agent-linux-amd64 you@host:/opt/beszel-agent/beszel-agent-stats
+scp bin/beszel-agent-linux-amd64 you@host:/opt/beszel-agent/beszel-agent-stats
 ```
+
+It cross-compiles for Linux (amd64/arm64), Windows (amd64) and macOS (arm64).
 
 Install it *alongside* the agent already running, not over it. No service restart
 is needed and rolling back is deleting one file.

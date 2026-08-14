@@ -13,7 +13,9 @@ cd "$(dirname "$0")"
 
 UPSTREAM_TAG="${UPSTREAM_TAG:-v0.18.7}"
 SRC_DIR="beszel"
-OUT_DIR="../bin"
+# Absolute, because the build runs from inside the upstream checkout and a
+# relative path would quietly resolve somewhere other than intended.
+OUT_DIR="$(pwd)/bin"
 
 if ! command -v go > /dev/null; then
     echo "Go toolchain not found. Install it first (brew install go)." >&2
