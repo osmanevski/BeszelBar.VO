@@ -7,14 +7,12 @@ struct MenuHeaderView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("BeszelBar")
+                    Text("BeszelBar.VO")
                         .font(.system(size: 13, weight: .semibold))
-                    if let selected = appState.selectedInstance {
-                        Text(selected.name.isEmpty ? selected.url : selected.name)
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
+                    Text("Osmanevski")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
 
                 Spacer()

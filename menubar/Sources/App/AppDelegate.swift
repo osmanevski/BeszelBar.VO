@@ -6,15 +6,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var observationTask: Task<Void, Never>?
 
-    /// What the menu bar reads.
-    static let statusTitle = "BeszelBar.VO"
-
     func applicationDidFinishLaunching(_: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "server.rack", accessibilityDescription: Self.statusTitle)
+            button.image = NSImage(systemSymbolName: "server.rack", accessibilityDescription: "BeszelBar")
             button.image?.size = NSSize(width: 18, height: 18)
-            button.title = " \(Self.statusTitle)"
         }
 
         item.menu = MenuBuilder.build(appState: AppState.shared)
@@ -63,24 +59,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let button = statusItem?.button {
             let alertCount = appState.activeAlerts.count
-            let onSSH = !appState.dataSource.isHub
-
-            // The icon carries the state: filled when alerts are firing, slashed
-            // when the hub is out of the picture. A degraded source that looked
-            // identical to a healthy one would be the worst of both.
-            let symbol: String
             if alertCount > 0 {
-                symbol = "server.rack.fill"
-            } else if onSSH {
-                symbol = "bolt.horizontal.circle"
+                button.image = NSImage(systemSymbolName: "server.rack.fill", accessibilityDescription: "BeszelBar")
+                button.title = " \(alertCount)"
             } else {
-                symbol = "server.rack"
+                button.image = NSImage(systemSymbolName: "server.rack", accessibilityDescription: "BeszelBar")
+                button.title = ""
             }
-
-            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: Self.statusTitle)
-            button.title = alertCount > 0
-                ? " \(Self.statusTitle) \(alertCount)"
-                : " \(Self.statusTitle)"
             button.image?.size = NSSize(width: 18, height: 18)
         }
 
