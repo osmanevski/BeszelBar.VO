@@ -100,10 +100,10 @@ enum SettingsTab: CaseIterable {
 
     var title: String {
         switch self {
-        case .general: return "General"
-        case .hubs: return "Hubs"
+        case .general: return "Genel"
+        case .hubs: return "Merkezler"
         case .ssh: return "SSH"
-        case .about: return "About"
+        case .about: return "Hakkında"
         }
     }
 
@@ -129,13 +129,13 @@ struct HubsView: View {
                     Image(systemName: "server.rack")
                         .font(.system(size: 40))
                         .foregroundColor(.secondary)
-                    Text("No Hubs Configured")
+                    Text("Merkez Yapılandırılmamış")
                         .font(.headline)
-                    Text("Add a Beszel hub to start monitoring your servers")
+                    Text("Sunucularınızı izlemeye başlamak için bir Beszel merkezi ekleyin")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Add Hub") {
+                    Button("Merkez Ekle") {
                         showingAddSheet = true
                     }
                     .buttonStyle(PillButtonStyle(isPrimary: true))
@@ -157,13 +157,13 @@ struct HubsView: View {
                 .listStyle(.inset)
 
                 HStack {
-                    Text("\(appState.instances.count) hub\(appState.instances.count == 1 ? "" : "s")")
+                    Text("\(appState.instances.count) merkez")
                         .font(.caption)
                         .foregroundColor(.secondary)
 
                     Spacer()
 
-                    Button("Add Hub") {
+                    Button("Merkez Ekle") {
                         showingAddSheet = true
                     }
                     .buttonStyle(PillButtonStyle(isPrimary: true))
@@ -206,12 +206,12 @@ struct InstanceRow: View {
             Spacer()
 
             if isSelected {
-                Text("Active")
+                Text("Etkin")
                     .font(.caption)
                     .foregroundColor(.green)
             }
 
-            Button("Edit") {
+            Button("Düzenle") {
                 onEdit()
             }
             .buttonStyle(PillButtonStyle())
@@ -238,24 +238,24 @@ struct AddHubSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Add Beszel Hub")
+            Text("Beszel Merkezi Ekle")
                 .font(.headline)
                 .padding(.top, 20)
                 .padding(.bottom, 16)
 
             Form {
-                TextField("Name", text: $name)
+                TextField("Ad", text: $name)
                     .textFieldStyle(.roundedBorder)
 
                 TextField("URL", text: $url)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.URL)
 
-                TextField("Email", text: $email)
+                TextField("E-posta", text: $email)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.emailAddress)
 
-                SecureField("Password", text: $password)
+                SecureField("Parola", text: $password)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.password)
             }
@@ -272,7 +272,7 @@ struct AddHubSheet: View {
             Spacer()
 
             HStack {
-                Button("Cancel") {
+                Button("Vazgeç") {
                     dismiss()
                 }
                 .buttonStyle(PillButtonStyle())
@@ -285,7 +285,7 @@ struct AddHubSheet: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Text("Add Hub")
+                        Text("Merkez Ekle")
                     }
                 }
                 .buttonStyle(PillButtonStyle(isPrimary: true))
@@ -322,7 +322,7 @@ struct AddHubSheet: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Connection failed: \(error.localizedDescription)"
+                    errorMessage = "Bağlantı kurulamadı: \(error.localizedDescription)"
                     isLoading = false
                 }
             }
@@ -354,22 +354,22 @@ struct EditHubSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Edit Hub")
+            Text("Merkezi Düzenle")
                 .font(.headline)
                 .padding(.top, 20)
                 .padding(.bottom, 16)
 
             Form {
-                TextField("Name", text: $name)
+                TextField("Ad", text: $name)
                     .textFieldStyle(.roundedBorder)
 
                 TextField("URL", text: $url)
                     .textFieldStyle(.roundedBorder)
 
-                TextField("Email", text: $email)
+                TextField("E-posta", text: $email)
                     .textFieldStyle(.roundedBorder)
 
-                SecureField("Password", text: $password)
+                SecureField("Parola", text: $password)
                     .textFieldStyle(.roundedBorder)
             }
             .formStyle(.grouped)
@@ -385,7 +385,7 @@ struct EditHubSheet: View {
             Spacer()
 
             HStack {
-                Button("Delete") {
+                Button("Sil") {
                     appState.removeInstance(instance)
                     dismiss()
                 }
@@ -393,13 +393,13 @@ struct EditHubSheet: View {
 
                 Spacer()
 
-                Button("Cancel") {
+                Button("Vazgeç") {
                     dismiss()
                 }
                 .buttonStyle(PillButtonStyle())
                 .keyboardShortcut(.escape)
 
-                Button("Save") {
+                Button("Kaydet") {
                     testAndSave()
                 }
                 .buttonStyle(PillButtonStyle(isPrimary: true))
@@ -442,7 +442,7 @@ struct EditHubSheet: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Connection failed: \(error.localizedDescription)"
+                    errorMessage = "Bağlantı kurulamadı: \(error.localizedDescription)"
                     isLoading = false
                 }
             }
@@ -457,14 +457,14 @@ struct GeneralView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                SectionHeader(title: "SYSTEM")
+                SectionHeader(title: "SİSTEM")
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Start at Login", isOn: $launchAtLogin)
+                    Toggle("Oturum açıldığında başlat", isOn: $launchAtLogin)
                         .onChange(of: launchAtLogin) { _, newValue in
                             setLaunchAtLogin(newValue)
                         }
-                    Text("Automatically open BeszelBar when you start your Mac.")
+                    Text("Mac’inizi açtığınızda BeszelBar’ı otomatik olarak başlatır.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -474,23 +474,23 @@ struct GeneralView: View {
                 Divider()
                     .padding(.horizontal, 20)
 
-                SectionHeader(title: "REFRESH")
+                SectionHeader(title: "YENİLEME")
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Refresh interval")
+                        Text("Yenileme aralığı")
                         Spacer()
                         Picker("", selection: $refreshInterval) {
-                            Text("10 sec").tag(10)
-                            Text("30 sec").tag(30)
-                            Text("1 min").tag(60)
-                            Text("2 min").tag(120)
-                            Text("5 min").tag(300)
+                            Text("10 sn").tag(10)
+                            Text("30 sn").tag(30)
+                            Text("1 dk").tag(60)
+                            Text("2 dk").tag(120)
+                            Text("5 dk").tag(300)
                         }
                         .labelsHidden()
                         .frame(width: 100)
                     }
-                    Text("How often BeszelBar polls your hubs for updates.")
+                    Text("BeszelBar’ın merkezleri hangi sıklıkta yenileyeceğini belirler.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -501,7 +501,7 @@ struct GeneralView: View {
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Spacer()
-                Button("Quit BeszelBar") {
+                Button("BeszelBar’dan Çık") {
                     NSApplication.shared.terminate(nil)
                 }
                 .buttonStyle(PillButtonStyle(isPrimary: true))
@@ -519,7 +519,7 @@ struct GeneralView: View {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            print("Failed to set launch at login: \(error)")
+            print("Oturum açılışında başlatma ayarlanamadı: \(error)")
         }
     }
 }
@@ -561,11 +561,11 @@ struct AboutView: View {
                 .font(.title2)
                 .fontWeight(.bold)
 
-            Text("Version 1.0.0")
+            Text("Sürüm 1.0.1")
                 .font(.caption)
                 .foregroundColor(.secondary)
 
-            Text("Monitor your Beszel servers from the menu bar, with SSH fallback when the hub is unreachable.")
+            Text("Beszel sunucularınızı menü çubuğundan izleyin; merkeze ulaşılamadığında SSH üzerinden görüntülemeye devam edin.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -590,7 +590,7 @@ struct AboutView: View {
 
             // The original author's notice stays. The code is still largely
             // theirs, and MIT asks for the notice to travel with it.
-            Text("Fork of BeszelBar — © 2026 Bruno DURAND. MIT License.")
+            Text("BeszelBar çatallaması — © 2026 Bruno DURAND. MIT Lisansı.")
                 .font(.caption2)
                 .foregroundColor(.secondary)
                 .padding(.bottom, 16)

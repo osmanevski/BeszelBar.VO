@@ -10,13 +10,13 @@ struct BeszelBarApp: App {
         }
         .commands {
             CommandGroup(after: .appSettings) {
-                Button("Settings...") {
+                Button("Ayarlar…") {
                     WindowManager.shared.showSettings()
                 }
                 .keyboardShortcut(",")
             }
             CommandGroup(after: .appTermination) {
-                Button("Quit BeszelBar") {
+                Button("BeszelBar’dan Çık") {
                     NSApp.terminate(nil)
                 }
                 .keyboardShortcut("q")

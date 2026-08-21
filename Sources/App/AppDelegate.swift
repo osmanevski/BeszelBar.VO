@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             while !Task.isCancelled {
                 await withCheckedContinuation { continuation in
                     withObservationTracking {
-                        _ = AppState.shared.activeAlerts
+                        _ = AppState.shared.actionableAlerts
                     } onChange: {
                         continuation.resume()
                     }
@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refreshStatusButton() {
         guard let button = statusItem?.button else { return }
 
-        let alertCount = AppState.shared.activeAlerts.count
+        let alertCount = AppState.shared.actionableAlerts.count
         if alertCount > 0 {
             button.image = NSImage(systemSymbolName: "server.rack.fill", accessibilityDescription: "BeszelBar")
             button.title = " \(alertCount)"

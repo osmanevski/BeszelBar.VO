@@ -31,33 +31,33 @@ enum MenuBuilder {
         case .hub:
             break
         case .ssh(let reason):
-            menu.addItem(createInfoItem("⚠︎ Hub unreachable — SSH", subtext: reason))
+            menu.addItem(createInfoItem("⚠︎ Merkeze ulaşılamıyor — SSH", subtext: reason))
             menu.addItem(NSMenuItem.separator())
         case .sshDirect:
             menu.addItem(createInfoItem(
-                "SSH Direct — hub bypassed",
-                subtext: "Read from each machine. No history, no alerts."
+                "Doğrudan SSH — merkez atlandı",
+                subtext: "Her makineden doğrudan okunuyor. Geçmiş ve uyarılar kullanılamaz."
             ))
             menu.addItem(NSMenuItem.separator())
         }
 
-        if !appState.activeAlerts.isEmpty {
-            menu.addItem(createAlertsSubmenu(alerts: appState.activeAlerts, systems: appState.selectedInstanceSystems))
+        if !appState.actionableAlerts.isEmpty {
+            menu.addItem(createAlertsSubmenu(alerts: appState.actionableAlerts, systems: appState.selectedInstanceSystems))
             menu.addItem(NSMenuItem.separator())
         }
 
         if appState.instances.isEmpty && appState.sshTargets.isEmpty {
-            menu.addItem(createInfoItem("No Hub Configured", subtext: "Open Settings to add a hub or an SSH target"))
+            menu.addItem(createInfoItem("Merkez Yapılandırılmamış", subtext: "Bir merkez veya SSH hedefi eklemek için Ayarlar’ı açın"))
         } else if appState.isLoading {
-            let item = NSMenuItem(title: "Loading...", action: nil, keyEquivalent: "")
+            let item = NSMenuItem(title: "Yükleniyor…", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         } else if appState.selectedInstanceSystems.isEmpty {
             menu.addItem(createInfoItem(
-                "No Systems Found",
+                "Sistem Bulunamadı",
                 subtext: appState.dataSource.isHub
-                    ? "Check your hub configuration"
-                    : "Check your SSH targets"
+                    ? "Merkez yapılandırmasını kontrol edin"
+                    : "SSH hedeflerini kontrol edin"
             ))
         } else {
             for system in appState.selectedInstanceSystems.prefix(15) {
@@ -66,10 +66,10 @@ enum MenuBuilder {
             }
 
             if appState.selectedInstanceSystems.count > 15 {
-                let more = NSMenuItem(title: "+\(appState.selectedInstanceSystems.count - 15) more systems", action: nil, keyEquivalent: "")
+                let more = NSMenuItem(title: "+\(appState.selectedInstanceSystems.count - 15) sistem daha", action: nil, keyEquivalent: "")
                 more.isEnabled = false
                 more.attributedTitle = NSAttributedString(
-                    string: "+\(appState.selectedInstanceSystems.count - 15) more systems",
+                    string: "+\(appState.selectedInstanceSystems.count - 15) sistem daha",
                     attributes: [.foregroundColor: NSColor.secondaryLabelColor]
                 )
                 menu.addItem(more)
@@ -83,7 +83,7 @@ enum MenuBuilder {
         }
 
         let settingsItem = NSMenuItem(
-            title: "Settings...",
+            title: "Ayarlar…",
             action: #selector(MenuActions.openSettings),
             keyEquivalent: ","
         )
@@ -98,7 +98,7 @@ enum MenuBuilder {
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
-            title: "Quit BeszelBar",
+            title: "BeszelBar’dan Çık",
             action: #selector(MenuActions.quit),
             keyEquivalent: "q"
         )
@@ -113,7 +113,7 @@ enum MenuBuilder {
         // action stays wired. A key equivalent closing the menu is what a key
         // equivalent is expected to do; a click is not.
         let item = NSMenuItem(
-            title: "Refresh Now",
+            title: "Şimdi Yenile",
             action: #selector(MenuActions.refreshNow),
             keyEquivalent: "r"
         )
@@ -123,7 +123,7 @@ enum MenuBuilder {
             content: {
                 let appState = AppState.shared
                 return MenuActionRow.Content(
-                    title: appState.isLoading ? "Refreshing…" : "Refresh Now",
+                    title: appState.isLoading ? "Yenileniyor…" : "Şimdi Yenile",
                     symbol: "arrow.clockwise",
                     isEnabled: !appState.isLoading
                 )
@@ -149,15 +149,15 @@ enum MenuBuilder {
                 let appState = AppState.shared
                 let toolTip: String
                 if appState.sshTargets.isEmpty {
-                    toolTip = "Add a machine under Settings → SSH first."
+                    toolTip = "Önce Ayarlar → SSH bölümünden bir makine ekleyin."
                 } else if appState.sshDirectModeEnabled {
-                    toolTip = "Reading each machine over SSH. The hub is not being contacted."
+                    toolTip = "Her makine SSH üzerinden okunuyor. Merkezle bağlantı kurulmuyor."
                 } else {
-                    toolTip = "Read each machine over SSH instead of asking the hub."
+                    toolTip = "Merkeze sormak yerine her makineyi SSH üzerinden okuyun."
                 }
 
                 return MenuActionRow.Content(
-                    title: "SSH Direct Mode",
+                    title: "Doğrudan SSH Modu",
                     symbol: "terminal",
                     isChecked: appState.sshDirectModeEnabled,
                     isEnabled: !appState.sshTargets.isEmpty,
@@ -174,7 +174,7 @@ enum MenuBuilder {
     }
 
     private static func createHubSwitcherSubmenu(appState: AppState) -> NSMenuItem {
-        let item = NSMenuItem(title: "Switch Hub", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: "Merkez Değiştir", action: nil, keyEquivalent: "")
         item.image = NSImage(systemSymbolName: "arrow.left.arrow.right", accessibilityDescription: nil)
         item.image?.size = NSSize(width: 14, height: 14)
 
@@ -200,7 +200,7 @@ enum MenuBuilder {
     }
 
     private static func createAlertsSubmenu(alerts: [AlertRecord], systems: [SystemRecord]) -> NSMenuItem {
-        let item = NSMenuItem(title: "Alerts (\(alerts.count))", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: "Uyarılar (\(alerts.count))", action: nil, keyEquivalent: "")
         item.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)
         item.image?.size = NSSize(width: 14, height: 14)
         item.image?.isTemplate = false
@@ -208,7 +208,7 @@ enum MenuBuilder {
         let submenu = NSMenu()
 
         for alert in alerts.prefix(10) {
-            let systemName = systems.first(where: { $0.id == alert.system })?.name ?? alert.system ?? "Unknown"
+            let systemName = systems.first(where: { $0.id == alert.system })?.name ?? alert.system ?? "Bilinmiyor"
             let alertItem = NSMenuItem()
 
             let view = NSHostingView(rootView: AlertMenuRowView(alert: alert, systemName: systemName))
@@ -220,7 +220,7 @@ enum MenuBuilder {
 
         if alerts.count > 10 {
             submenu.addItem(NSMenuItem.separator())
-            let moreItem = NSMenuItem(title: "+\(alerts.count - 10) more alerts", action: nil, keyEquivalent: "")
+            let moreItem = NSMenuItem(title: "+\(alerts.count - 10) uyarı daha", action: nil, keyEquivalent: "")
             moreItem.isEnabled = false
             submenu.addItem(moreItem)
         }
@@ -247,7 +247,10 @@ enum MenuBuilder {
         item.target = MenuActions.shared
         item.representedObject = system.id
 
-        let hostingView = NSHostingView(rootView: SystemMenuRowView(system: system))
+        let memoryBreakdown = appState.memoryBreakdowns[system.id]
+        let hostingView = NSHostingView(
+            rootView: SystemMenuRowView(system: system, memoryBreakdown: memoryBreakdown)
+        )
         hostingView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 44)
 
         let wrapper = NSView(frame: hostingView.frame)
@@ -273,8 +276,15 @@ enum MenuBuilder {
         let details = appState.systemDetails[system.id]
 
         let detailItem = NSMenuItem()
-        let detailView = NSHostingView(rootView: SystemDetailView(system: system, details: details))
-        detailView.frame = NSRect(x: 0, y: 0, width: 250, height: 180)
+        let detailView = NSHostingView(rootView: SystemDetailView(
+            system: system,
+            details: details,
+            memoryBreakdown: appState.memoryBreakdowns[system.id]
+        ))
+        detailView.frame = NSRect(
+            x: 0, y: 0, width: 250,
+            height: appState.memoryBreakdowns[system.id] == nil ? 180 : 198
+        )
         detailItem.view = detailView
         submenu.addItem(detailItem)
 
@@ -284,7 +294,7 @@ enum MenuBuilder {
             let headerItem = NSMenuItem()
             let headerView = NSHostingView(rootView:
                 HStack {
-                    Label("Containers (\(containers.count))", systemImage: "shippingbox.fill")
+                    Label("Konteynerler (\(containers.count))", systemImage: "shippingbox.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.primary)
                     Spacer()
@@ -307,7 +317,7 @@ enum MenuBuilder {
             }
 
             if containers.count > 10 {
-                let moreItem = NSMenuItem(title: "+\(containers.count - 10) more containers", action: nil, keyEquivalent: "")
+                let moreItem = NSMenuItem(title: "+\(containers.count - 10) konteyner daha", action: nil, keyEquivalent: "")
                 moreItem.image = NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: nil)
                 moreItem.image?.size = NSSize(width: 12, height: 12)
 
@@ -327,7 +337,7 @@ enum MenuBuilder {
         submenu.addItem(NSMenuItem.separator())
 
         let openItem = NSMenuItem(
-            title: "Open in Browser",
+            title: "Tarayıcıda Aç",
             action: #selector(MenuActions.openSystemInBrowser(_:)),
             keyEquivalent: ""
         )
@@ -340,7 +350,7 @@ enum MenuBuilder {
         let hostname = details?.hostname ?? system.info?.h
         if let hostname = hostname {
             let copyItem = NSMenuItem(
-                title: "Copy Hostname",
+                title: "Makine Adını Kopyala",
                 action: #selector(MenuActions.copyToClipboard(_:)),
                 keyEquivalent: ""
             )

@@ -12,6 +12,7 @@ final class AppState {
     var systemDetails: [String: SystemDetailsRecord] = [:]
     var containers: [String: [ContainerRecord]] = [:]
     var activeAlerts: [AlertRecord] = []
+    var memoryBreakdowns: [String: MemoryBreakdown] = [:]
     var isLoading = false
     var errorMessage: String?
     var isConfigured = false
@@ -23,6 +24,22 @@ final class AppState {
     var dataSource: DataSource = .hub
     var sshTargets: [SSHTarget] = []
     var sshFailures: [String: String] = [:]
+
+    /// Alerts that should affect the menu bar. Beszel counts VMware balloon
+    /// pages as used RAM. When a direct snapshot proves the guest's own memory
+    /// is below the configured threshold, that Memory alert is informational
+    /// noise rather than workload pressure.
+    var actionableAlerts: [AlertRecord] {
+        activeAlerts.filter { alert in
+            guard alert.isMemoryAlert,
+                  let systemID = alert.system,
+                  let breakdown = memoryBreakdowns[systemID],
+                  let threshold = alert.effectiveThreshold else {
+                return true
+            }
+            return breakdown.usedPercentage > threshold
+        }
+    }
 
     /// Read the machines directly and leave the hub out of it entirely.
     ///
@@ -80,7 +97,7 @@ final class AppState {
             // only source, so use it directly rather than reporting nothing.
             if !sshTargets.isEmpty {
                 loadTask?.cancel()
-                loadTask = Task { await loadFromSSH(source: .ssh(reason: "No hub configured")) }
+                loadTask = Task { await loadFromSSH(source: .ssh(reason: "Merkez yapılandırılmamış")) }
             }
             return
         }
@@ -99,6 +116,20 @@ final class AppState {
                 selectedInstanceSystems = systems.sorted { $0.name < $1.name }
                 dataSource = .hub
                 sshFailures = [:]
+
+                // The hub has no separate balloon field. A direct agent snapshot
+                // supplies only that missing piece; the hub remains the source of
+                // systems, details, containers and alerts.
+                if !sshTargets.isEmpty {
+                    let direct = await sshService.fetchAll(targets: sshTargets)
+                    guard !Task.isCancelled else { return }
+                    memoryBreakdowns = mapMemoryBreakdowns(
+                        from: direct,
+                        onto: selectedInstanceSystems
+                    )
+                } else {
+                    memoryBreakdowns = [:]
+                }
             } catch is CancellationError {
                 return
             } catch {
@@ -131,6 +162,7 @@ final class AppState {
         selectedInstanceSystems = result.systems
         systemDetails = result.details
         containers = result.containers
+        memoryBreakdowns = result.memoryBreakdowns
         sshFailures = result.failures
         dataSource = source
 
@@ -138,7 +170,7 @@ final class AppState {
         // path. Leaving stale ones on screen would imply they are still current.
         activeAlerts = []
         errorMessage = result.systems.isEmpty
-            ? (source.reason ?? "No usable SSH targets")
+            ? (source.reason ?? "Kullanılabilir SSH hedefi yok")
             : nil
     }
 
@@ -215,6 +247,7 @@ final class AppState {
         systemDetails = [:]
         containers = [:]
         activeAlerts = []
+        memoryBreakdowns = [:]
         loadSystems()
         loadSystemDetails()
         loadAlerts()
@@ -248,6 +281,7 @@ final class AppState {
             systemDetails = [:]
             containers = [:]
             activeAlerts = []
+            memoryBreakdowns = [:]
             if selectedInstance != nil {
                 loadSystems()
                 loadSystemDetails()
@@ -371,14 +405,67 @@ final class AppState {
     func testSSHTarget(_ target: SSHTarget) async -> String {
         let result = await sshService.fetchAll(targets: [target])
         if let failure = result.failures[target.recordID] {
-            return "Failed — \(failure)"
+            return "Başarısız — \(failure)"
         }
         guard let system = result.systems.first, let info = system.info else {
-            return "Failed — no readable data returned"
+            return "Başarısız — okunabilir veri alınamadı"
         }
         let cpu = info.cpu.map { String(format: "%.1f%%", $0) } ?? "?"
         let mem = info.mp.map { String(format: "%.1f%%", $0) } ?? "?"
-        return "OK — cpu \(cpu), ram \(mem)"
+        let balloonStatus = result.balloonCapableTargetIDs.contains(target.recordID)
+            ? "Balloon hazır"
+            : "Balloon alanı yok; hazır agent’ı kurun"
+        return "Başarılı — CPU \(cpu), RAM \(mem) · \(balloonStatus)"
+    }
+
+    /// Re-key direct readings from SSH target ids to PocketBase system ids.
+    /// Host address is strongest; normalized display name and hostname cover
+    /// installations where the hub stores a private address instead.
+    private func mapMemoryBreakdowns(
+        from direct: SSHStatsService.Result,
+        onto hubSystems: [SystemRecord]
+    ) -> [String: MemoryBreakdown] {
+        var mapped: [String: MemoryBreakdown] = [:]
+
+        for (targetID, breakdown) in direct.memoryBreakdowns {
+            guard let directSystem = direct.systems.first(where: { $0.id == targetID }) else {
+                continue
+            }
+            let directDetails = direct.details[targetID]
+            let directNames = [directSystem.name, directSystem.info?.h, directDetails?.hostname]
+                .compactMap { $0 }
+                .map(normalizedSystemIdentity)
+                .filter { !$0.isEmpty }
+
+            let match = hubSystems.first { hubSystem in
+                if let directHost = directSystem.host,
+                   let hubHost = hubSystem.host,
+                   !directHost.isEmpty,
+                   directHost.caseInsensitiveCompare(hubHost) == .orderedSame {
+                    return true
+                }
+
+                let hubNames = [hubSystem.name, hubSystem.info?.h]
+                    .compactMap { $0 }
+                    .map(normalizedSystemIdentity)
+                return !Set(directNames).isDisjoint(with: hubNames)
+            }
+
+            if let match {
+                mapped[match.id] = breakdown
+            }
+        }
+        return mapped
+    }
+
+    private func normalizedSystemIdentity(_ value: String) -> String {
+        value
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .unicodeScalars
+            .filter(CharacterSet.alphanumerics.contains)
+            .map(String.init)
+            .joined()
+            .lowercased()
     }
 
     private func getOrCreateService(for instance: Instance) -> BeszelAPIService {

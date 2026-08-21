@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SystemMenuRowView: View {
     let system: SystemRecord
+    var memoryBreakdown: MemoryBreakdown? = nil
     @AppStorage("showStatsInMenu") private var showStatsInMenu = true
 
     var body: some View {
@@ -19,7 +20,10 @@ struct SystemMenuRowView: View {
                             StatPill(value: "\(Int(cpu))%", icon: "cpu")
                         }
                         if let mem = system.memoryPercentage {
-                            StatPill(value: "\(Int(mem))%", icon: "memorychip")
+                            StatPill(
+                                value: "\(Int(memoryBreakdown?.usedPercentage ?? mem))%",
+                                icon: "memorychip"
+                            )
                         }
                         if let disk = system.diskPercentage {
                             StatPill(value: "\(Int(disk))%", icon: "internaldrive")

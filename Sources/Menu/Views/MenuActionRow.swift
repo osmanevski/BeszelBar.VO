@@ -79,7 +79,7 @@ final class MenuActionRow: NSView {
         checkView.isHidden = !content.isChecked
         toolTip = content.toolTip
         setAccessibilityLabel(content.title)
-        setAccessibilityValue(content.isChecked ? "on" : "off")
+        setAccessibilityValue(content.isChecked ? "açık" : "kapalı")
 
         if !content.isEnabled { isHighlighted = false }
         applyColors(for: content)

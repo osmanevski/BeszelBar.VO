@@ -275,8 +275,7 @@ enum BeszelAPIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .httpError(let statusCode, let url):
-            return "HTTP \(statusCode) error for \(url)"
+            return "\(url) için HTTP \(statusCode) hatası"
         }
     }
 }
-

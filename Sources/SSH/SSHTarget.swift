@@ -14,7 +14,7 @@ struct SSHTarget: Identifiable, Codable, Equatable, Hashable {
 
         var displayName: String {
             switch self {
-            case .local: return "This Mac"
+            case .local: return "Bu Mac"
             case .ssh: return "SSH"
             }
         }
@@ -65,7 +65,7 @@ struct SSHTarget: Identifiable, Codable, Equatable, Hashable {
 
     var displaySubtitle: String {
         switch transport {
-        case .local: return "this Mac"
+        case .local: return "bu Mac"
         case .ssh: return "\(user)@\(host)"
         }
     }

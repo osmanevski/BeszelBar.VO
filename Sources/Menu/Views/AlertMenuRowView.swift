@@ -12,7 +12,7 @@ struct AlertMenuRowView: View {
                 .foregroundColor(alertColor)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(alert.name)
+                Text(alert.displayName)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
 

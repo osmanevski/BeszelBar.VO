@@ -26,7 +26,7 @@ struct ContainerMenuRowView: View {
 
                 Spacer()
 
-                Text(container.status)
+                Text(container.displayStatus)
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
             }

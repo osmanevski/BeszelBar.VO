@@ -3,6 +3,7 @@ import SwiftUI
 struct SystemDetailView: View {
     let system: SystemRecord
     var details: SystemDetailsRecord? = nil
+    var memoryBreakdown: MemoryBreakdown? = nil
 
     private var cpuModel: String? {
         details?.cpu ?? system.info?.m
@@ -45,7 +46,7 @@ struct SystemDetailView: View {
                             if cpuModel != nil {
                                 Text("•")
                             }
-                            Text("\(cores) cores")
+                            Text("\(cores) çekirdek")
                         }
                     }
                     .font(.system(size: 10))
@@ -71,7 +72,7 @@ struct SystemDetailView: View {
                 .padding(.vertical, 2)
 
             VStack(alignment: .leading, spacing: 6) {
-                Label("Usage", systemImage: "chart.bar.fill")
+                Label("Kullanım", systemImage: "chart.bar.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.primary)
 
@@ -79,7 +80,11 @@ struct SystemDetailView: View {
                     MetricBar(label: "CPU", value: cpu, color: valueColor(cpu))
                 }
                 if let mem = system.memoryPercentage {
-                    MetricBar(label: "Memory", value: mem, color: valueColor(mem))
+                    if let memoryBreakdown {
+                        MemoryBreakdownBar(breakdown: memoryBreakdown)
+                    } else {
+                        MetricBar(label: "RAM", value: mem, color: valueColor(mem))
+                    }
                 }
                 if let disk = system.diskPercentage {
                     MetricBar(label: "Disk", value: disk, color: valueColor(disk))
@@ -95,10 +100,10 @@ struct SystemDetailView: View {
         let days = Int(seconds) / 86400
         let hours = (Int(seconds) % 86400) / 3600
         if days > 0 {
-            return "\(days)d \(hours)h"
+            return "\(days)g \(hours)sa"
         } else {
             let mins = (Int(seconds) % 3600) / 60
-            return "\(hours)h \(mins)m"
+            return "\(hours)sa \(mins)dk"
         }
     }
 
@@ -152,6 +157,82 @@ struct MetricBar: View {
                 }
             }
             .frame(height: 6)
+        }
+    }
+}
+
+struct MemoryBreakdownBar: View {
+    let breakdown: MemoryBreakdown
+
+    private var usedColor: Color {
+        if breakdown.usedPercentage >= 90 { return AppColors.red }
+        if breakdown.usedPercentage >= 70 { return AppColors.orange }
+        return AppColors.green
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text("RAM")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("\(Int(breakdown.usedPercentage))%")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.primary)
+            }
+
+            GeometryReader { geometry in
+                let usedWidth = geometry.size.width * min(breakdown.usedPercentage / 100, 1)
+                let balloonWidth = geometry.size.width * min(breakdown.balloonPercentage / 100, 1)
+
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(height: 6)
+
+                    HStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(usedColor)
+                            .frame(width: usedWidth, height: 6)
+                        Rectangle()
+                            .fill(Color.blue)
+                            .frame(width: min(balloonWidth, max(geometry.size.width - usedWidth, 0)), height: 6)
+                    }
+                }
+            }
+            .frame(height: 6)
+
+            HStack(spacing: 10) {
+                BreakdownLegend(
+                    label: "Kullanım",
+                    value: breakdown.usedPercentage,
+                    color: usedColor
+                )
+                BreakdownLegend(
+                    label: "Balloon",
+                    value: breakdown.balloonPercentage,
+                    color: .blue
+                )
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
+private struct BreakdownLegend: View {
+    let label: String
+    let value: Double
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Circle()
+                .fill(color)
+                .frame(width: 5, height: 5)
+            Text("\(label) \(Int(value))%")
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.secondary)
         }
     }
 }

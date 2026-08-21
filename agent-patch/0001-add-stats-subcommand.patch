@@ -1,12 +1,17 @@
 diff --git a/agent/snapshot.go b/agent/snapshot.go
 new file mode 100644
-index 0000000..b616b11
+index 0000000..58b2d6c
 --- /dev/null
 +++ b/agent/snapshot.go
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,82 @@
 +package agent
 +
 +import (
++	"os"
++	"os/exec"
++	"runtime"
++	"strconv"
++	"strings"
 +	"time"
 +
 +	"github.com/henrygd/beszel/internal/common"
@@ -17,6 +22,14 @@ index 0000000..b616b11
 +// delta-based metrics (cpu, network and disk I/O) have a meaningful interval.
 +const DefaultSnapshotWindow = time.Second
 +
++// SnapshotData is the upstream payload plus measurements that the hub does not
++// currently preserve. The top-level field is present even at zero so clients
++// can distinguish a capable agent from an older snapshot format.
++type SnapshotData struct {
++	*system.CombinedData
++	BalloonBytes uint64 `json:"balloon_bytes"`
++}
++
 +// Snapshot collects a single round of system stats and returns it.
 +//
 +// It exists for one-shot invocations that have no hub connection: the process
@@ -26,14 +39,52 @@ index 0000000..b616b11
 +// Waiting for sampleWindow first gives those counters something to subtract.
 +//
 +// Memory and disk usage are point-in-time reads and are unaffected by the wait.
-+func (a *Agent) Snapshot(sampleWindow time.Duration) *system.CombinedData {
++func (a *Agent) Snapshot(sampleWindow time.Duration) SnapshotData {
 +	if sampleWindow > 0 {
 +		time.Sleep(sampleWindow)
 +	}
-+	return a.gatherStats(common.DataRequestOptions{
-+		CacheTimeMs:    defaultDataCacheTimeMs,
-+		IncludeDetails: true,
-+	})
++	return SnapshotData{
++		CombinedData: a.gatherStats(common.DataRequestOptions{
++			CacheTimeMs:    defaultDataCacheTimeMs,
++			IncludeDetails: true,
++		}),
++		BalloonBytes: readBalloonBytes(),
++	}
++}
++
++// readBalloonBytes returns memory reclaimed from this guest by VMware. The
++// in-kernel driver's debugfs value is a page count. The VMware Tools command is
++// a cross-platform fallback when debugfs is unavailable or unreadable.
++func readBalloonBytes() uint64 {
++	if data, err := os.ReadFile("/sys/kernel/debug/vmmemctl"); err == nil {
++		for _, line := range strings.Split(string(data), "\n") {
++			fields := strings.Fields(line)
++			if len(fields) >= 3 && fields[0] == "current" {
++				if pages, err := strconv.ParseUint(fields[2], 10, 64); err == nil {
++					return pages * uint64(os.Getpagesize())
++				}
++			}
++		}
++	}
++
++	toolPaths := []string{"vmware-toolbox-cmd"}
++	if runtime.GOOS == "windows" {
++		toolPaths = append(toolPaths,
++			`C:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe`,
++			`C:\Program Files (x86)\VMware\VMware Tools\VMwareToolboxCmd.exe`,
++		)
++	}
++	for _, toolPath := range toolPaths {
++		if output, err := exec.Command(toolPath, "stat", "balloon").Output(); err == nil {
++			fields := strings.Fields(string(output))
++			if len(fields) >= 2 {
++				if megabytes, err := strconv.ParseUint(fields[0], 10, 64); err == nil {
++					return megabytes * 1024 * 1024
++				}
++			}
++		}
++	}
++	return 0
 +}
 diff --git a/internal/cmd/agent/agent.go b/internal/cmd/agent/agent.go
 index a27908d..558a7d5 100644

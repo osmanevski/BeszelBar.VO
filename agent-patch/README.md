@@ -32,6 +32,13 @@ arithmetically valid and completely meaningless. So `Snapshot()` waits first,
 giving those counters an interval worth subtracting. Memory and disk are
 point-in-time reads and are unaffected by the wait.
 
+On VMware guests the snapshot also reports `balloon_bytes`, read from the
+in-kernel balloon driver (with VMware Tools as a fallback). Beszel's ordinary
+memory percentage includes those reclaimed pages; the menu bar uses this field
+to show workload memory separately from the provider's balloon allocation.
+The field remains present as zero when ballooning is idle, allowing the app's
+connection test to confirm that the target supports the new format.
+
 The default window is one second. Pass another to widen it:
 
 ```
@@ -80,6 +87,20 @@ Install the .NET SDK and run the `dotnet build` step from upstream's Makefile if
 you want real sensor support.
 
 ## Deploying
+
+Pull-ready binaries are tracked under `prebuilt/`. Install one without a Go
+toolchain using the repository-root command:
+
+```
+./agent-patch/install-prebuilt.sh linux-amd64 root@host ~/.ssh/id_ed25519
+./agent-patch/install-prebuilt.sh windows-amd64 administrator@host ~/.ssh/id_ed25519
+```
+
+The installer verifies the checksum, tests the candidate, and retains the first
+old binary as `.pre-balloon`. Use a deployment credential with file-transfer and
+install permission; the app's forced-command stats key can remain locked down.
+
+To deploy a locally rebuilt binary by hand instead:
 
 Install the patched binary alongside the running agent rather than over it:
 

@@ -13,8 +13,8 @@ struct SSHTargetsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Toggle(isOn: directModeBinding) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("SSH Direct Mode")
-                            Text("Read these machines over SSH and do not contact the hub at all. Also on the menu, under Refresh Now.")
+                            Text("Doğrudan SSH Modu")
+                            Text("Bu makineleri SSH üzerinden okuyun ve merkezle hiç bağlantı kurmayın. Bu seçenek menüde, Şimdi Yenile’nin altında da bulunur.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -25,8 +25,8 @@ struct SSHTargetsView: View {
 
                     Toggle(isOn: fallbackBinding) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Fall back to SSH when the hub is unreachable")
-                            Text("When the hub does not answer, these machines are read directly. No history and no alerts on this path — only what is happening right now.")
+                            Text("Merkeze ulaşılamadığında SSH’ye geç")
+                            Text("Merkez yanıt vermezse bu makineler doğrudan okunur. Bu yolda geçmiş ve uyarılar yoktur; yalnızca o anki durum gösterilir.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -38,13 +38,13 @@ struct SSHTargetsView: View {
 
                     Divider()
 
-                    SectionHeader(title: "Targets")
+                    SectionHeader(title: "HEDEFLER")
 
                     if appState.sshTargets.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("No targets")
+                            Text("Hedef yok")
                                 .foregroundColor(.secondary)
-                            Text("Each target needs a patched beszel-agent — one that supports the stats subcommand.")
+                            Text("Her hedefte stats alt komutunu destekleyen güncellenmiş bir beszel-agent gerekir.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -64,7 +64,7 @@ struct SSHTargetsView: View {
                         }
                     }
 
-                    Button("Add Target") {
+                    Button("Hedef Ekle") {
                         editingTarget = nil
                         showingSheet = true
                     }
@@ -122,9 +122,9 @@ struct SSHTargetRow: View {
 
             Spacer()
 
-            Button("Edit", action: onEdit)
+            Button("Düzenle", action: onEdit)
                 .buttonStyle(PillButtonStyle())
-            Button("Remove", action: onRemove)
+            Button("Kaldır", action: onRemove)
                 .buttonStyle(DestructivePillButtonStyle())
         }
         .padding(.vertical, 6)
@@ -148,13 +148,13 @@ struct SSHTargetSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(existing == nil ? "Add Target" : "Edit Target")
+            Text(existing == nil ? "Hedef Ekle" : "Hedefi Düzenle")
                 .font(.headline)
 
             Form {
-                TextField("Name", text: $name)
+                TextField("Ad", text: $name)
 
-                Picker("Transport", selection: $transport) {
+                Picker("Bağlantı", selection: $transport) {
                     ForEach(SSHTarget.Transport.allCases, id: \.self) { option in
                         Text(option.displayName).tag(option)
                     }
@@ -162,18 +162,18 @@ struct SSHTargetSheet: View {
                 .pickerStyle(.segmented)
 
                 if transport == .ssh {
-                    TextField("User", text: $user)
-                    TextField("Address", text: $host)
-                    TextField("Key", text: $keyPath)
+                    TextField("Kullanıcı", text: $user)
+                    TextField("Adres", text: $host)
+                    TextField("Anahtar", text: $keyPath)
                 }
 
-                TextField("Command", text: $command)
+                TextField("Komut", text: $command)
             }
             .formStyle(.grouped)
 
             Text(transport == .ssh
-                 ? "Lock the key to a forced command on the target with `command=\"…stats\",restrict`. It can then do nothing but print stats, even if it leaks."
-                 : "The command runs directly on this Mac — no SSH, no key.")
+                 ? "Hedefte anahtarı `command=\"…stats\",restrict` ile yalnızca bu komuta kilitleyin. Anahtar ele geçirilse bile sadece istatistik yazdırabilir."
+                 : "Komut doğrudan bu Mac’te çalışır; SSH ve anahtar kullanılmaz.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -181,21 +181,21 @@ struct SSHTargetSheet: View {
             if let testResult = testResult {
                 Text(testResult)
                     .font(.system(size: 11))
-                    .foregroundColor(testResult.hasPrefix("OK") ? .green : .red)
+                    .foregroundColor(testResult.hasPrefix("Başarılı") ? .green : .red)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack {
-                Button(isTesting ? "Testing…" : "Test Connection") { runTest() }
+                Button(isTesting ? "Sınanıyor…" : "Bağlantıyı Sına") { runTest() }
                     .buttonStyle(PillButtonStyle())
                     .disabled(isTesting || !draft.isUsable)
 
                 Spacer()
 
-                Button("Cancel") { dismiss() }
+                Button("Vazgeç") { dismiss() }
                     .buttonStyle(PillButtonStyle())
 
-                Button("Save") { save() }
+                Button("Kaydet") { save() }
                     .buttonStyle(PillButtonStyle(isPrimary: true))
                     .disabled(!draft.isUsable || name.trimmingCharacters(in: .whitespaces).isEmpty)
             }

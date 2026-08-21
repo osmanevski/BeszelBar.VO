@@ -12,6 +12,8 @@ final class SSHStatsService: @unchecked Sendable {
         let systems: [SystemRecord]
         let details: [String: SystemDetailsRecord]
         let containers: [String: [ContainerRecord]]
+        let memoryBreakdowns: [String: MemoryBreakdown]
+        let balloonCapableTargetIDs: Set<String>
         let failures: [String: String]
     }
 
@@ -24,7 +26,7 @@ final class SSHStatsService: @unchecked Sendable {
             case .commandFailed(let target, let message):
                 return "\(target): \(message)"
             case .timedOut(let target, let seconds):
-                return "\(target): no response in \(seconds)s"
+                return "\(target): \(seconds) sn içinde yanıt vermedi"
             }
         }
     }
@@ -44,12 +46,17 @@ final class SSHStatsService: @unchecked Sendable {
     func fetchAll(targets: [SSHTarget]) async -> Result {
         let usable = targets.filter(\.isUsable)
         guard !usable.isEmpty else {
-            return Result(systems: [], details: [:], containers: [:], failures: [:])
+            return Result(
+                systems: [], details: [:], containers: [:],
+                memoryBreakdowns: [:], balloonCapableTargetIDs: [], failures: [:]
+            )
         }
 
         var systems: [SystemRecord] = []
         var details: [String: SystemDetailsRecord] = [:]
         var containers: [String: [ContainerRecord]] = [:]
+        var memoryBreakdowns: [String: MemoryBreakdown] = [:]
+        var balloonCapableTargetIDs: Set<String> = []
         var failures: [String: String] = [:]
 
         await withTaskGroup(of: (SSHTarget, Swift.Result<AgentSnapshot, Error>).self) { group in
@@ -73,6 +80,12 @@ final class SSHStatsService: @unchecked Sendable {
                     let containerRecords = snapshot.containerRecords(for: target)
                     if !containerRecords.isEmpty {
                         containers[target.recordID] = containerRecords
+                    }
+                    if let breakdown = snapshot.memoryBreakdown {
+                        memoryBreakdowns[target.recordID] = breakdown
+                    }
+                    if snapshot.balloonBytes != nil {
+                        balloonCapableTargetIDs.insert(target.recordID)
                     }
                 case .failure(let error):
                     failures[target.recordID] = error.localizedDescription
@@ -101,7 +114,14 @@ final class SSHStatsService: @unchecked Sendable {
         )
         systems.sort { (position[$0.id] ?? 0) < (position[$1.id] ?? 0) }
 
-        return Result(systems: systems, details: details, containers: containers, failures: failures)
+        return Result(
+            systems: systems,
+            details: details,
+            containers: containers,
+            memoryBreakdowns: memoryBreakdowns,
+            balloonCapableTargetIDs: balloonCapableTargetIDs,
+            failures: failures
+        )
     }
 
     private func fetch(target: SSHTarget) async throws -> AgentSnapshot {
@@ -185,7 +205,7 @@ final class SSHStatsService: @unchecked Sendable {
                 guard process.terminationStatus == 0 else {
                     let message = String(data: stderrData, encoding: .utf8)?
                         .split(separator: "\n").last.map(String.init)
-                        ?? "exit code \(process.terminationStatus)"
+                        ?? "çıkış kodu \(process.terminationStatus)"
                     continuation.resume(
                         throwing: SSHError.commandFailed(target: target.name, message: message)
                     )

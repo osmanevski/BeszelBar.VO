@@ -39,13 +39,40 @@ struct SystemInfo: Codable, Hashable {
     let sv: [Int]?
 }
 
+/// Splits the guest's reported memory pressure into memory used by workloads
+/// and memory reclaimed by a hypervisor balloon driver.
+///
+/// Beszel's ordinary percentage includes both. Keeping the split outside
+/// `SystemInfo` is intentional: this extra measurement comes from our direct
+/// agent snapshot and is not part of the hub's systems API.
+struct MemoryBreakdown: Equatable, Hashable {
+    let reportedPercentage: Double
+    let usedPercentage: Double
+    let balloonPercentage: Double
+
+    init?(reportedPercentage: Double?, balloonBytes: UInt64?, totalBytes: Double?) {
+        guard let reportedPercentage,
+              let balloonBytes,
+              balloonBytes > 0,
+              let totalBytes,
+              totalBytes > 0 else {
+            return nil
+        }
+
+        let balloonPercentage = min(Double(balloonBytes) / totalBytes * 100, 100)
+        self.reportedPercentage = min(max(reportedPercentage, 0), 100)
+        self.balloonPercentage = balloonPercentage
+        self.usedPercentage = min(max(reportedPercentage - balloonPercentage, 0), 100)
+    }
+}
+
 extension SystemRecord {
     var displayStatus: String {
-        guard let status = status?.lowercased() else { return "Unknown" }
+        guard let status = status?.lowercased() else { return "Bilinmiyor" }
         switch status {
-        case "up", "online": return "Online"
-        case "down", "offline": return "Offline"
-        case "pending": return "Pending"
+        case "up", "online": return "Çevrimiçi"
+        case "down", "offline": return "Çevrimdışı"
+        case "pending": return "Bekliyor"
         default: return status.capitalized
         }
     }
@@ -121,10 +148,10 @@ enum ContainerHealth: Int, Codable, Hashable {
 
     var displayText: String {
         switch self {
-        case .none: return "No Health Check"
-        case .starting: return "Starting"
-        case .healthy: return "Healthy"
-        case .unhealthy: return "Unhealthy"
+        case .none: return "Sağlık Denetimi Yok"
+        case .starting: return "Başlatılıyor"
+        case .healthy: return "Sağlıklı"
+        case .unhealthy: return "Sağlıksız"
         }
     }
 
@@ -153,6 +180,17 @@ struct ContainerRecord: Identifiable, Codable, Hashable {
     var updatedDate: Date {
         Date(timeIntervalSince1970: Double(updated) / 1000.0)
     }
+
+    var displayStatus: String {
+        switch status.lowercased() {
+        case "running", "up": return "Çalışıyor"
+        case "stopped", "exited", "down": return "Durdu"
+        case "starting": return "Başlatılıyor"
+        case "restarting": return "Yeniden başlatılıyor"
+        case "paused": return "Duraklatıldı"
+        default: return status
+        }
+    }
 }
 
 struct ContainerStatsRecord: Identifiable, Codable {
@@ -174,20 +212,54 @@ struct AlertRecord: Identifiable, Codable {
     let system: String?
     let metric: String?
     let threshold: Double?
+    /// Beszel 0.18+ calls the threshold `value`; older releases used
+    /// `threshold`. Decode both so alert decisions remain version tolerant.
+    let value: Double?
     let enabled: Bool?
     let triggered: Bool?
     let created: String?
     let updated: String?
 
     var displayMetric: String {
-        metric ?? "unknown"
+        switch metric?.lowercased() {
+        case "memory", "mem": return "RAM"
+        case "disk": return "Disk"
+        case "temperature", "temp": return "Sıcaklık"
+        case "network": return "Ağ"
+        case "bandwidth": return "Bant genişliği"
+        case "cpu": return "CPU"
+        case .none: return "bilinmiyor"
+        default: return metric ?? "bilinmiyor"
+        }
+    }
+
+    var displayName: String {
+        switch name.lowercased() {
+        case "memory": return "RAM"
+        case "disk": return "Disk"
+        case "temperature": return "Sıcaklık"
+        case "network": return "Ağ"
+        case "bandwidth": return "Bant genişliği"
+        case "status": return "Durum"
+        case "cpu": return "CPU"
+        default: return name
+        }
     }
 
     var displayThreshold: String {
-        if let t = threshold {
+        if let t = effectiveThreshold {
             return String(format: "%.0f", t)
         }
         return "-"
+    }
+
+    var effectiveThreshold: Double? {
+        threshold ?? value
+    }
+
+    var isMemoryAlert: Bool {
+        name.caseInsensitiveCompare("Memory") == .orderedSame
+            || metric?.caseInsensitiveCompare("Memory") == .orderedSame
     }
 }
 

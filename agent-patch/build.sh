@@ -16,6 +16,7 @@ SRC_DIR="beszel"
 # Absolute, because the build runs from inside the upstream checkout and a
 # relative path would quietly resolve somewhere other than intended.
 OUT_DIR="$(pwd)/bin"
+PREBUILT_DIR="$(pwd)/prebuilt"
 
 if ! command -v go > /dev/null; then
     echo "Go toolchain not found. Install it first (brew install go)." >&2
@@ -59,6 +60,7 @@ NOTE
 fi
 
 mkdir -p "$OUT_DIR"
+mkdir -p "$PREBUILT_DIR"
 
 echo "==> Building"
 for spec in "linux amd64 beszel-agent-linux-amd64" \
@@ -68,9 +70,13 @@ for spec in "linux amd64 beszel-agent-linux-amd64" \
     set -- $spec
     GOOS="$1" GOARCH="$2" CGO_ENABLED=0 go build -ldflags "-s -w" \
         -o "${OUT_DIR}/$3" ./internal/cmd/agent
+    cp "${OUT_DIR}/$3" "${PREBUILT_DIR}/$3"
     echo "    $3"
 done
 
+(cd "$PREBUILT_DIR" && shasum -a 256 beszel-agent-* > SHA256SUMS)
+
 echo
 echo "Binaries in $(cd "$OUT_DIR" && pwd)"
+echo "Pull-ready copies in $(cd "$PREBUILT_DIR" && pwd)"
 echo "Verify with: <binary> stats | head"

@@ -11,6 +11,7 @@ struct AgentSnapshot: Decodable {
     let info: SystemInfo?
     let containers: [AgentContainer]?
     let details: AgentDetails?
+    let balloonBytes: UInt64?
 
     enum CodingKeys: String, CodingKey {
         case stats
@@ -18,6 +19,17 @@ struct AgentSnapshot: Decodable {
         case containers = "container"
         // `Details` has no json tag upstream, so it marshals under the Go field name.
         case details = "Details"
+        case balloonBytes = "balloon_bytes"
+    }
+
+    var memoryBreakdown: MemoryBreakdown? {
+        let totalBytes = details?.memoryTotal.map(Double.init)
+            ?? stats?.mem.map { $0 * 1024 * 1024 * 1024 }
+        return MemoryBreakdown(
+            reportedPercentage: stats?.memPct ?? info?.mp,
+            balloonBytes: balloonBytes,
+            totalBytes: totalBytes
+        )
     }
 }
 

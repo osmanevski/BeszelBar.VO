@@ -20,7 +20,8 @@ cannot report.
 primary and keeps doing what it is good at. When it stops answering, the app
 reads each machine **directly over SSH**, with no hub anywhere in the path.
 
-- Hub answers → identical to upstream. SSH is never contacted.
+- Hub answers → the hub stays primary; configured SSH targets are also sampled
+  for hypervisor balloon memory, which the hub does not expose separately.
 - Hub fails → SSH targets are polled, live figures appear, and the menu says
   **⚠︎ Hub unreachable — SSH** with the underlying error.
 - Hub recovers → back to normal on the next refresh, no intervention.
@@ -44,25 +45,46 @@ you need a heartbeat service outside your fleet — nothing here does that.
 ## Requirements
 
 Every machine you want to reach over SSH needs a Beszel agent that supports a
-`stats` subcommand. Stock agents do not have it, so this repository ships the
-patch that adds it — 35 lines, in [`agent-patch/`](agent-patch/).
+`stats` subcommand. Stock agents do not have it, so this repository ships both
+the source patch and pull-ready Linux, Windows and macOS binaries in
+[`agent-patch/`](agent-patch/).
 
 You also need the Swift toolchain from Xcode Command Line Tools
 (`xcode-select --install`). A full Xcode install is **not** required.
 
 ## Install
 
-**1. Build and deploy the patched agent** to each machine:
+**1. Install the pull-ready agent** on each machine. No Go toolchain is needed:
+
+```bash
+git pull
+./agent-patch/install-prebuilt.sh linux-amd64 root@server.example ~/.ssh/id_ed25519
+./agent-patch/install-prebuilt.sh linux-arm64 root@arm-server.example ~/.ssh/id_ed25519
+./agent-patch/install-prebuilt.sh windows-amd64 administrator@windows.example ~/.ssh/id_ed25519
+```
+
+The installer verifies the tracked binary against `SHA256SUMS`, runs it before
+replacement, and preserves the first previous copy as `.pre-balloon`. The SSH
+credential used for installation needs file-transfer and install permission;
+the restricted stats-only key configured in the app can remain restricted.
+
+To install the local macOS snapshot agent:
+
+```bash
+./agent-patch/install-prebuilt.sh darwin-arm64 local
+```
+
+To rebuild the tracked binaries from the pinned Beszel source instead:
 
 ```bash
 cd agent-patch && ./build.sh
-scp bin/beszel-agent-linux-amd64 you@host:/opt/beszel-agent/beszel-agent-stats
 ```
 
-It cross-compiles for Linux (amd64/arm64), Windows (amd64) and macOS (arm64).
+This cross-compiles for Linux (amd64/arm64), Windows (amd64) and macOS (arm64)
+and refreshes both the ignored build output and the pull-ready copies.
 
-Install it *alongside* the agent already running, not over it. No service restart
-is needed and rolling back is deleting one file.
+It is installed *alongside* the agent already running, not over it. No service
+restart is needed. Rolling back is replacing it with the `.pre-balloon` copy.
 
 **2. Create a key that can do nothing else.** On each target, add to
 `authorized_keys` (`C:\ProgramData\ssh\administrators_authorized_keys` on
@@ -94,6 +116,12 @@ for the app turns up two copies, the installed one and the build output.
 **4. Add your machines** under Settings → SSH. Each target has a *Test
 Connection* button — SSH configuration is fiddly enough that guessing is not good
 enough.
+
+The app subtracts VMware balloon memory from the headline RAM percentage. The
+normal menu row therefore reflects workload usage and does not enter an alert
+state because of provider ballooning. Hovering the system opens a stacked RAM
+bar that labels workload usage and Balloon separately. When Balloon is zero, the
+ordinary single-value presentation is used.
 
 > The bundle is ad-hoc signed, not notarized, so macOS will ask on first launch.
 > Right-click → Open, or build it yourself and read the source first — which is
@@ -147,7 +175,8 @@ See [`FORK.md`](FORK.md) for the full diff against upstream and
 - **No temperature sensors on Windows** unless you build with the .NET SDK; the
   build script writes a placeholder for the embedded component instead.
 - **Version drift.** The stats binary and the running agent are separate files.
-  Update one, rebuild the other, or they measure with different code.
+  After pulling a release that changes `agent-patch/prebuilt`, rerun the installer
+  for each target.
 - **Pull model.** It answers when you look. Your Mac has to be awake.
 
 ## Credit
